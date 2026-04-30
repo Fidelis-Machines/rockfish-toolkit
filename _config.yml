@@ -1,13 +1,11 @@
 title: Rockfish Toolkit
 description: Suricata plugins and utilities — capture, IIoT/OT protocol parsers, per-flow telemetry. Powers the Rockfish NDR sensor.
-theme: jekyll-theme-slate
+
+# No `theme:` — we use a fully custom _layouts/default.html
+# with embedded dark-mode-only styling.
 plugins:
   - jekyll-seo-tag
 
-# Force dark color scheme — disables Pages auto-light/system preference
-color_scheme: dark
-
-# Hide the auto-generated repo-name H1
 show_downloads: false
 github:
   is_project_page: true

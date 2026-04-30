@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark only">
+<title>{{ site.title | default: page.title | default: site.github.repository_name }}</title>
+{% if site.description %}<meta name="description" content="{{ site.description }}">{% endif %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+{% seo %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    color-scheme: dark only;
+    --bg:        #0a0a0a;
+    --fg:        #e8e8e8;
+    --fg-dim:    rgba(255,255,255,.65);
+    --fg-muted:  rgba(255,255,255,.35);
+    --copper:    #B87333;
+    --copper-h:  #d4894a;
+    --border:    rgba(255,255,255,.08);
+    --surface:   rgba(255,255,255,.03);
+    --code-bg:   #0d0d0d;
+  }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.65;
+  }
+  body { min-height: 100vh; }
+
+  header.page-header {
+    border-bottom: 1px solid var(--border);
+    padding: 36px 24px 28px;
+    text-align: center;
+  }
+  header.page-header .copper-rule {
+    display: block;
+    width: 80px;
+    height: 2px;
+    background: var(--copper);
+    margin: 0 auto 16px;
+  }
+  header.page-header h1 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--fg);
+  }
+  header.page-header .tagline {
+    font-size: .95rem;
+    color: var(--fg-dim);
+    margin-top: 6px;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  main.content {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+
+  /* Markdown content */
+  main.content h1,
+  main.content h2,
+  main.content h3,
+  main.content h4,
+  main.content h5,
+  main.content h6 {
+    color: var(--fg);
+    font-weight: 700;
+    margin: 32px 0 12px;
+    letter-spacing: -.015em;
+  }
+  main.content h1 { font-size: 1.8rem; }
+  main.content h2 {
+    font-size: 1.35rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-top: 44px;
+  }
+  main.content h3 { font-size: 1.1rem; color: var(--copper); margin-top: 28px; }
+  main.content h4 { font-size: 1rem; }
+
+  main.content p, main.content li, main.content dd {
+    color: var(--fg-dim);
+  }
+  main.content p { margin: 12px 0; }
+  main.content strong, main.content b { color: var(--fg); font-weight: 600; }
+  main.content em { font-style: italic; }
+
+  main.content a {
+    color: var(--copper);
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(184,115,51,.4);
+  }
+  main.content a:hover {
+    color: var(--copper-h);
+    border-bottom-color: var(--copper-h);
+  }
+
+  main.content ul, main.content ol { margin: 12px 0 12px 24px; }
+  main.content li { margin: 4px 0; }
+
+  main.content code {
+    background: var(--surface);
+    color: var(--copper);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, Menlo, monospace;
+    font-size: 0.9em;
+  }
+
+  main.content pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin: 16px 0;
+    overflow-x: auto;
+    line-height: 1.55;
+  }
+  main.content pre code {
+    background: transparent;
+    border: none;
+    color: var(--fg);
+    padding: 0;
+    font-size: .88em;
+  }
+
+  main.content table {
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+    margin: 16px 0;
+    font-size: .92rem;
+  }
+  main.content th {
+    background: rgba(184,115,51,.12);
+    color: var(--copper);
+    border-bottom: 1px solid var(--copper);
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: .9rem;
+  }
+  main.content td {
+    border-top: 1px solid var(--border);
+    padding: 9px 14px;
+    color: var(--fg-dim);
+    vertical-align: top;
+  }
+  main.content tr:nth-child(even) td { background: rgba(255,255,255,.012); }
+
+  main.content blockquote {
+    border-left: 3px solid var(--copper);
+    background: rgba(184,115,51,.05);
+    color: var(--fg-dim);
+    padding: 8px 18px;
+    margin: 16px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  main.content blockquote p { margin: 6px 0; }
+
+  main.content hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+
+  main.content img { max-width: 100%; height: auto; border-radius: 8px; }
+
+  /* Center-aligned shortcuts often used in READMEs */
+  main.content p[align="center"] { text-align: center; }
+  main.content p[align="center"] a { border-bottom: none; }
+
+  footer.site-footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 32px;
+    text-align: center;
+    color: var(--fg-muted);
+    font-size: .85rem;
+  }
+  footer.site-footer a { color: var(--fg-dim); }
+  footer.site-footer a:hover { color: var(--copper); }
+
+  ::selection { background: rgba(184,115,51,.4); color: #fff; }
+
+  @media (max-width: 720px) {
+    header.page-header { padding: 28px 20px 22px; }
+    main.content { padding: 28px 22px 60px; }
+    main.content table { font-size: .85rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <span class="copper-rule"></span>
+  <h1>{{ site.title | default: site.github.repository_name }}</h1>
+  {% if site.description %}<p class="tagline">{{ site.description }}</p>{% endif %}
+</header>
+
+<main class="content">
+  {{ content }}
+</main>
+
+<footer class="site-footer">
+  &copy; 2025&ndash;2026 Fidelis Farm &amp; Technologies, LLC &middot;
+  <a href="https://rockfishndr.com/">rockfishndr.com</a> &middot;
+  <a href="https://github.com/{{ site.github.repository_nwo }}">GitHub</a>
+</footer>
+
+</body>
+</html>
