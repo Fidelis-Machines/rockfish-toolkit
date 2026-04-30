@@ -12,10 +12,16 @@
 
 ## Description
 
-Rockfish Toolkit is a toolkit of Suricata plugins and utilities — high-speed
-packet capture, IIoT/OT protocol parsers, per-flow telemetry, and the build
-scripts that tie them together. It powers the Rockfish NDR sensor's
-detection pipeline.
+Rockfish Toolkit is a toolkit of Suricata plugins and utilities — high-speed packet capture, IIoT/OT protocol parsers, per-flow telemetry, and the build scripts that tie them together. It powers the Rockfish NDR sensor's detection pipeline and grows with each phase of Fidelis Machines' research in robotics and OT security.
+
+## Get the code
+
+```bash
+git clone https://github.com/Fidelis-Machines/rockfish-toolkit.git
+cd rockfish-toolkit
+```
+
+Browse the source on GitHub: <https://github.com/Fidelis-Machines/rockfish-toolkit>
 
 ## Components
 
@@ -32,7 +38,7 @@ detection pipeline.
 | [`suricata-proto-plugins/transport_perf/`](suricata-proto-plugins/transport_perf/) | `tcp_perf`, `udp_perf` | Per-flow TCP handshake RTT, retransmits, zero-windows, window stats; UDP request/response RTT and inter-arrival jitter. |
 | [`suricata-proto-plugins/payload_entropy/`](suricata-proto-plugins/payload_entropy/) | `payload_entropy` | Per-flow Shannon entropy, PCR (producer/consumer ratio), and SPLT (Sequence of Packet Lengths and Times). |
 
-### Protocol parsers (IIoT / OT / surveillance)
+### Protocol parsers (industrial protocols)
 
 Application-layer parsers that decode binary protocols not covered by
 Suricata's built-ins. Each emits its own EVE event type.
