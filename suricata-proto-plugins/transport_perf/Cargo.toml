@@ -1,0 +1,25 @@
+[workspace]
+
+[package]
+name = "suricata-transport-perf"
+version = "0.1.0"
+edition = "2021"
+authors = ["Fidelis Farm & Technologies, LLC"]
+license = "GPL-2.0-only"
+description = "Suricata packet-logger plugin: per-flow TCP/UDP performance metrics (handshake RTT, retransmits, zero-windows, UDP request/response RTT)"
+
+[lib]
+name = "suricata_transport_perf"
+crate-type = ["staticlib"]
+
+[dependencies]
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[profile.release]
+opt-level = 3
+lto = true

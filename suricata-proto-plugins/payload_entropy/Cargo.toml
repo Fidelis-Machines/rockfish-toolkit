@@ -1,0 +1,25 @@
+[workspace]
+
+[package]
+name = "suricata-payload-entropy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Fidelis Farm & Technologies, LLC"]
+license = "GPL-2.0-only"
+description = "Suricata packet-logger plugin: per-flow Shannon entropy of payload bytes (encryption / exfil / DGA detection)"
+
+[lib]
+name = "suricata_payload_entropy"
+crate-type = ["staticlib"]
+
+[dependencies]
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[profile.release]
+opt-level = 3
+lto = true

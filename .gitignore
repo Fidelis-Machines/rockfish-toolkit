@@ -1,0 +1,17 @@
+# Rust build output (any depth)
+target/
+**/target/
+Cargo.lock
+
+# Compiled C objects and shared libraries
+*.o
+*.a
+*.so
+
+# cbindgen-generated FFI headers
+*_ffi.h
+
+# Editor / OS
+*.swp
+*.swo
+.DS_Store

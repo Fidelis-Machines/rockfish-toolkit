@@ -1,0 +1,14 @@
+/* Rockfish BACnet Parser Plugin for Suricata
+ * Copyright 2025-2026. Fidelis Farm & Technologies, LLC
+ * SPDX-License-Identifier: GPL-2.0-only
+ */
+
+#ifndef BACNET_PLUGIN_H
+#define BACNET_PLUGIN_H
+
+#define BACNET_PLUGIN_VERSION "0.1.0"
+
+/* Registration function (implemented in applayer.c) */
+void BacnetParserRegister(void);
+
+#endif /* BACNET_PLUGIN_H */
