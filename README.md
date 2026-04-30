@@ -130,7 +130,7 @@ Rockfish NDR **Performance** report page and SLA dashboards.
 ### `payload_entropy` — Encrypted Traffic Analysis
 
 A Suricata plugin emitting **`payload_entropy`** events. Implements
-the Cisco ETA (Encrypted Traffic Analytics) feature set, letting you
+a feature set similar to Cisco's ETA (Encrypted Traffic Analytics), letting you
 fingerprint traffic that's already inside TLS/QUIC without breaking
 encryption — finds C2 beacons, exfiltration tunnels, and custom-protocol
 covert channels by their **shape**, not their content.
