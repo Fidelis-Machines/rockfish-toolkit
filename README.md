@@ -4,6 +4,12 @@
 
 <h2 align="center">Rockfish Toolkit</h2>
 
+<p align="center">
+  <a href="https://docs.rockfishndr.com/">Documentation</a> &middot;
+  <a href="https://rockfishndr.com/">Rockfish NDR</a> &middot;
+  <a href="https://github.com/Fidelis-Machines/rockfish-toolkit/issues">Issues</a>
+</p>
+
 ## Description
 
 Rockfish Toolkit is a toolkit of Suricata plugins and utilities — high-speed
@@ -64,6 +70,116 @@ All scripts live in [`scripts/`](scripts/) and must be run from inside the
 
 The FMADIO ring plugin is built directly via its own `Makefile` (see
 [its README](suricata-plugin-fmadio-ring/README.md)).
+
+## Telemetry Plugins in Detail
+
+The two telemetry plugins are the analytics workhorses of the toolkit —
+they don't decode application protocols, they compute per-flow signals
+that downstream detection engines (HBOS, SIGMA) consume.
+
+### `transport_perf` — Network performance
+
+A Suricata plugin that emits **`tcp_perf`** and **`udp_perf`** events
+alongside Suricata's normal flow records. It tracks the per-flow signals
+you'd normally need a separate APM agent for — handshake latency,
+retransmits, application-level RTT, jitter, DNS health — without
+touching the application stack.
+
+**TCP metrics** (emitted as `tcp_perf` events, one per flow):
+
+| Field | Meaning |
+|---|---|
+| `handshake_rtt_us` | SYN-to-ACK time on the three-way handshake |
+| `ttfb_us` | Time-to-first-byte from handshake completion to first server payload |
+| `retransmits_toserver` / `_toclient` | Detected duplicate-sequence counts in each direction |
+| `zero_windows_toserver` / `_toclient` | Receive-window-exhaustion events |
+| `rst_toserver` / `_toclient` | RST close counts (vs. clean FIN) |
+| `state` | Derived health: `ok`, `drift`, `sla_breach`, `critical` |
+
+**UDP metrics** (emitted as `udp_perf` events):
+
+| Field | Meaning |
+|---|---|
+| `request_response_rtt_us` | Time between matched request / response pairs (DNS, RADIUS, NTP, SIP, etc.) |
+| `inter_arrival_jitter_us` | Variance of packet inter-arrival times |
+| `packet_loss_proxy` | Gap heuristic for sequenced UDP (RTP, QUIC) |
+| DNS-specific | Query duration, NXDOMAIN rate, response-code distribution |
+
+**Configuration** (`rockfish-transport-perf:` block in `suricata.yaml`):
+
+| Key | Default | Description |
+|---|---|---|
+| `enabled` | `yes` | Master toggle |
+| `tcp` | `yes` | Track TCP flows |
+| `udp` | `yes` | Track UDP flows |
+| `sample-rate` | `1` | Emit every Nth flow (1 = every flow) |
+| `max-flows` | `100000` | Memory cap on the in-flight flow table |
+
+**What it catches** — congested links, brownouts before users notice
+them (handshake-latency drift), failing peers (rising retransmits),
+capacity issues (zero-window saturation), zombie connections (high RST
+rate), DNS problems (slow lookups, NXDOMAIN spikes). Surfaces in the
+Rockfish NDR **Performance** report page and SLA dashboards.
+
+### `payload_entropy` — Encrypted Traffic Analysis
+
+A Suricata plugin emitting **`payload_entropy`** events. Implements
+the Cisco ETA (Encrypted Traffic Analytics) feature set, letting you
+fingerprint traffic that's already inside TLS/QUIC without breaking
+encryption — finds C2 beacons, exfiltration tunnels, and custom-protocol
+covert channels by their **shape**, not their content.
+
+Metrics are computed during a capped sample window (default first 8 KB
+per direction) so the cost stays bounded on long-lived flows.
+
+**Per-direction Shannon entropy** — `entropy_toserver`,
+`entropy_toclient` (bits/byte). Properly encrypted traffic sits at ~7.9;
+structured / plaintext payloads fall below 6; tunneled binary embedded
+inside an encrypted-looking wrapper is recognizable here.
+
+**PCR (Producer / Consumer Ratio)** — `pcr ∈ [0..1] =
+bytes_toserver / (bytes_toserver + bytes_toclient)`. Conversation shape
+in one number:
+- `pcr ≈ 0.05` → client-receives (download, browsing)
+- `pcr ≈ 0.50` → symmetric (interactive)
+- `pcr ≈ 0.85+` → client-sends (upload, **exfil candidate**)
+
+**SPLT — Sequence of Packet Lengths and Times** in three forms:
+- `splt_lengths` — `Vec<u16>` of raw payload lengths (first N packets)
+- `splt_iats_us` — `Vec<u32>` of inter-arrival times in microseconds
+- `splt` — letter-encoded summary string. Each packet becomes a letter
+  where **case marks direction** (uppercase = toserver, lowercase =
+  toclient) and the letter `A..K` / `a..k` is the log₂ size bucket
+  from `<32 B` to `≥1024 B`. Easy to grep for patterns:
+  - `AaAaAaAa` → regular small handshakes (likely beaconing)
+  - `AaKKKKKK` → small request, bulk transfer
+  - `KkKkKkKk` → balanced bulk
+
+**Sample-window byte counts** — `bytes_sampled_toserver`,
+`bytes_sampled_toclient` so consumers know how representative the
+entropy reading is.
+
+**Configuration** (`rockfish-payload-entropy:` block):
+
+| Key | Default | Description |
+|---|---|---|
+| `enabled` | `yes` | Master toggle |
+| `tcp` | `yes` | Sample TCP flows |
+| `udp` | `yes` | Sample UDP flows |
+| `sample-rate` | `1` | Emit every Nth flow |
+| `max-bytes-per-direction` | `8192` | Bytes inspected per direction (memory bound) |
+| `emit.entropy` | `yes` | Emit entropy fields |
+| `emit.pcr` | `yes` | Emit PCR field |
+| `emit.splt` | `yes` | Emit SPLT fields (heaviest payload — disable to shrink event size) |
+
+**What it catches** — beaconing (regular SPLT pattern + `pcr ≈ 0.5`
+over many short flows), exfiltration (high PCR + elevated entropy
+outbound), tunneling (entropy mismatch with expected protocol — e.g.,
+port 53 with `entropy_toserver = 7.8`), and C2 traffic that no signature
+matches but whose SPLT shape is anomalous for the destination. Surfaces
+in the Rockfish NDR **Encryption** report page: top encrypted talkers,
+exfil candidates, beacons by SPLT, common-shape clusters, and
+per-protocol entropy anomalies.
 
 ## Requirements
 
