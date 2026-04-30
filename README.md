@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://rockfishndr.com/rockfish-logo.png" alt="Rockfish NDR" width="320">
+  <a href="https://rockfishndr.com" title="Rockfish NDR — learn more"><img src="https://rockfishndr.com/rockfish-logo.png" alt="Rockfish NDR" width="320"></a>
 </p>
 
 <h2 align="center">Rockfish Toolkit</h2>
@@ -12,7 +12,9 @@
 
 ## Description
 
-Rockfish Toolkit is a toolkit of Suricata plugins and utilities — high-speed packet capture, IIoT/OT protocol parsers, per-flow telemetry, and the build scripts that tie them together. It powers the Rockfish NDR sensor's detection pipeline and grows with each phase of Fidelis Machines' research in robotics and OT security.
+Rockfish Toolkit is a toolkit of Suricata plugins and utilities — high-speed packet capture, IIoT/OT protocol parsers, per-flow telemetry, and the build scripts that tie them together. It powers the [Rockfish NDR](https://rockfishndr.com) sensor's detection pipeline and grows with each phase of Fidelis Machines' research in robotics and OT security.
+
+> **Learn more about Rockfish NDR** — the air-gap-native, ML-powered Network Detection &amp; Response platform built on this toolkit: <https://rockfishndr.com>
 
 ## Get the code
 
