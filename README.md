@@ -11,7 +11,7 @@
 
 ## Description
 
-Rockfish Toolkit is a toolkit of Suricata plugins and utilities — high-speed packet capture, IIoT/OT protocol parsers, per-flow telemetry, and the build scripts that tie them together. It powers the Rockfish NDR sensor's detection pipeline and grows with each phase of Fidelis Machines' research in ROS / OT / IoT security.
+Rockfish Toolkit is a collection of Suricata plugins and utilities — high-speed packet capture, IIoT/OT protocol parsers, per-flow telemetry, and the build scripts that tie them together. It powers the Rockfish NDR sensor's detection pipeline and grows with each phase of Fidelis Machines' research in ROS / OT / IoT security.
 
 > **Learn more about Rockfish NDR** — the air-gap-native Network Detection &amp; Response solution built with this toolkit: <https://rockfishndr.com>
 
