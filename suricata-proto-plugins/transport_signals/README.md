@@ -1,7 +1,7 @@
 # Rockfish Suricata Transport Signals Plugin
 
-Per-flow TCP and UDP signal metrics, emitted as `tcp_signals` and
-`udp_signals` events through Suricata's normal eve-log pipeline. Whatever
+Per-flow TCP and UDP signal metrics, emitted as `tcp_signal` and
+`udp_signal` events through Suricata's normal eve-log pipeline. Whatever
 `filetype:` your eve-log uses (regular file, unix_dgram, unix_stream,
 syslog, redis) — these events go there too, mixed in with your existing
 flow / dns / tls events.
@@ -33,7 +33,7 @@ The result is `rockfish-transport-signals.so`.
 ## Install
 
 Copy the `.so` into Suricata's plugin directory and reference it from
-`suricata.yaml`. Then enable `tcp_signals` and `udp_signals` under your
+`suricata.yaml`. Then enable `tcp_signal` and `udp_signal` under your
 existing `eve-log.types:` list — that's it.
 
 ```yaml
@@ -52,8 +52,8 @@ outputs:
         - tls:
             extended: yes
         # ── Transport signals events ─────────────────────────────
-        - tcp_signals
-        - udp_signals
+        - tcp_signal
+        - udp_signal
 
 # Optional plugin tuning (all keys optional, defaults shown).
 rockfish-transport-signals:
@@ -84,11 +84,11 @@ Sample TCP record (lives in the same eve stream as flow/dns/tls):
 {
   "timestamp": "2026-04-28T17:32:11.018452Z",
   "flow_id": 17628341205823,
-  "event_type": "tcp_signals",
+  "event_type": "tcp_signal",
   "src_ip": "10.1.2.45", "src_port": 49215,
   "dest_ip": "10.1.2.10", "dest_port": 443,
   "proto": "TCP",
-  "tcp_signals": {
+  "tcp_signal": {
     "start_us": 1748365931018452,
     "end_us":   1748365941312009,
     "duration_us": 10293557,
@@ -109,11 +109,11 @@ Sample UDP record:
 {
   "timestamp": "2026-04-28T17:32:11.118452Z",
   "flow_id": 17628341219991,
-  "event_type": "udp_signals",
+  "event_type": "udp_signal",
   "src_ip": "10.1.2.45", "src_port": 53412,
   "dest_ip": "10.1.2.1", "dest_port": 53,
   "proto": "UDP",
-  "udp_signals": {
+  "udp_signal": {
     "start_us": 1748365931118452,
     "end_us":   1748365931145812,
     "duration_us": 27360,
@@ -129,17 +129,17 @@ the standard `flow` event for the same `flow_id`.
 
 ## How rockfish-perf consumes this
 
-`rockfish-perf` reads the Suricata eve socket and now sees `tcp_signals`
-/ `udp_signals` mixed in with `flow` / `dns`. The fields surface in the
+`rockfish-perf` reads the Suricata eve socket and now sees `tcp_signal`
+/ `udp_signal` mixed in with `flow` / `dns`. The fields surface in the
 per-asset feature vector as:
 
 | Feature                    | Source                                |
 |----------------------------|---------------------------------------|
-| `tcp_handshake_rtt_ms_avg` | `tcp_signals.handshake_rtt_us`        |
+| `tcp_handshake_rtt_ms_avg` | `tcp_signal.handshake_rtt_us`         |
 | `tcp_retransmit_ratio`     | retransmits / packets                 |
 | `tcp_zero_window_ratio`    | zero_window / packets                 |
 | `tcp_out_of_order_ratio`   | out_of_order / packets                |
-| `udp_rtt_avg_ms`           | `udp_signals.rtt_avg_us`              |
+| `udp_rtt_avg_ms`           | `udp_signal.rtt_avg_us`               |
 | `udp_jitter_avg_ms`        | mean of per-direction `iat_stddev_us` |
 
 These dimensions are added to the HBOS drift baseline automatically.

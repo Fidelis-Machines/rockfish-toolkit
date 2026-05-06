@@ -2,9 +2,9 @@
  * Copyright 2025-2026. Fidelis Farm & Technologies, LLC
  * SPDX-License-Identifier: GPL-2.0-only
  *
- * Emits tcp_signals and udp_signals events through Suricata's own eve-log
+ * Emits tcp_signal and udp_signal events through Suricata's own eve-log
  * subsystem. The plugin does NOT manage its own output destination —
- * users enable it under `eve-log.types: [tcp_signals, udp_signals]` and
+ * users enable it under `eve-log.types: [tcp_signal, udp_signal]` and
  * the events flow to whatever filetype eve-log is configured for (regular
  * file, unix_dgram, unix_stream, redis, syslog).
  */
@@ -230,9 +230,9 @@ static int TpPacketLogger(ThreadVars *tv, void *thread_data, const Packet *p)
  * eve sub-loggers — emit JSON via Suricata's eve writer
  * ========================================================================= */
 
-static void emit_tcp_signals(SCJsonBuilder *jb, const TpTcpStats *s)
+static void emit_tcp_signal(SCJsonBuilder *jb, const TpTcpStats *s)
 {
-    SCJbOpenObject(jb, "tcp_signals");
+    SCJbOpenObject(jb, "tcp_signal");
     SCJbSetUint(jb, "start_us",     (uint64_t)s->start_us);
     SCJbSetUint(jb, "end_us",       (uint64_t)s->end_us);
     SCJbSetUint(jb, "duration_us",  (uint64_t)s->duration_us);
@@ -278,12 +278,12 @@ static void emit_tcp_signals(SCJsonBuilder *jb, const TpTcpStats *s)
     }
 
     SCJbSetString(jb, "close_reason", (const char *)s->close_reason);
-    SCJbClose(jb);   /* tcp_signals */
+    SCJbClose(jb);   /* tcp_signal */
 }
 
-static void emit_udp_signals(SCJsonBuilder *jb, const TpUdpStats *s)
+static void emit_udp_signal(SCJsonBuilder *jb, const TpUdpStats *s)
 {
-    SCJbOpenObject(jb, "udp_signals");
+    SCJbOpenObject(jb, "udp_signal");
     SCJbSetUint(jb, "start_us",     (uint64_t)s->start_us);
     SCJbSetUint(jb, "end_us",       (uint64_t)s->end_us);
     SCJbSetUint(jb, "duration_us",  (uint64_t)s->duration_us);
@@ -312,7 +312,7 @@ static void emit_udp_signals(SCJsonBuilder *jb, const TpUdpStats *s)
         if (s->has_iat_stddev_ts) SCJbSetFloat(jb, "iat_stddev_toserver_us", s->iat_stddev_toserver_us);
         if (s->has_iat_stddev_tc) SCJbSetFloat(jb, "iat_stddev_toclient_us", s->iat_stddev_toclient_us);
     }
-    SCJbClose(jb);   /* udp_signals */
+    SCJbClose(jb);   /* udp_signal */
 }
 
 static SCJsonBuilder *build_eve_header_for_flow(const Flow *f, const char *event_type)
@@ -355,10 +355,10 @@ static int TpTcpFlowLogger(ThreadVars *tv, void *thread_data, Flow *f)
     if (!rs_tp_take_tcp_stats(f->flow_hash, &stats) || !stats.valid) return 0;
 
     OutputJsonThreadCtx *thread = thread_data;
-    SCJsonBuilder *jb = build_eve_header_for_flow(f, "tcp_signals");
+    SCJsonBuilder *jb = build_eve_header_for_flow(f, "tcp_signal");
     if (jb == NULL) return 0;
 
-    emit_tcp_signals(jb, &stats);
+    emit_tcp_signal(jb, &stats);
     OutputJsonBuilderBuffer(tv, NULL, f, jb, thread);
     SCJbFree(jb);
     return 0;
@@ -375,10 +375,10 @@ static int TpUdpFlowLogger(ThreadVars *tv, void *thread_data, Flow *f)
     if (!rs_tp_take_udp_stats(f->flow_hash, &stats) || !stats.valid) return 0;
 
     OutputJsonThreadCtx *thread = thread_data;
-    SCJsonBuilder *jb = build_eve_header_for_flow(f, "udp_signals");
+    SCJsonBuilder *jb = build_eve_header_for_flow(f, "udp_signal");
     if (jb == NULL) return 0;
 
-    emit_udp_signals(jb, &stats);
+    emit_udp_signal(jb, &stats);
     OutputJsonBuilderBuffer(tv, NULL, f, jb, thread);
     SCJbFree(jb);
     return 0;
@@ -518,16 +518,16 @@ void RockfishTransportSignalsRegister(void)
         return;
     }
 
-    /* ── eve sub-modules: tcp_signals, udp_signals ─────────────────── */
+    /* ── eve sub-modules: tcp_signal, udp_signal ───────────────────── */
     if (tcp_enabled) {
         OutputRegisterFlowSubModule(LOGGER_USER, "eve-log",
-            "RockfishTcpSignalsLog", "eve-log.tcp_signals",
+            "RockfishTcpSignalLog", "eve-log.tcp_signal",
             OutputJsonLogInitSub, TpTcpFlowLogger,
             JsonLogThreadInit, JsonLogThreadDeinit);
     }
     if (udp_enabled) {
         OutputRegisterFlowSubModule(LOGGER_USER, "eve-log",
-            "RockfishUdpSignalsLog", "eve-log.udp_signals",
+            "RockfishUdpSignalLog", "eve-log.udp_signal",
             OutputJsonLogInitSub, TpUdpFlowLogger,
             JsonLogThreadInit, JsonLogThreadDeinit);
     }
@@ -551,9 +551,9 @@ void RockfishTransportSignalsRegister(void)
                 emit_udp_rtt       ? "yes" : "no",
                 emit_udp_jitter    ? "yes" : "no");
     SCLogNotice("    Events:            %s%s%s%s",
-                tcp_enabled ? "tcp_signals" : "",
+                tcp_enabled ? "tcp_signal" : "",
                 tcp_enabled && udp_enabled ? ", " : "",
-                udp_enabled ? "udp_signals" : "",
+                udp_enabled ? "udp_signal" : "",
                 (!tcp_enabled && !udp_enabled) ? "(none — both disabled)" : "");
     SCLogNotice("    Output:            via eve-log (add types to your eve-log.types list)");
     SCLogNotice("════════════════════════════════════════════════════════════");

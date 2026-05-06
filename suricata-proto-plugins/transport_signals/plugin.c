@@ -7,7 +7,7 @@
  *     out-of-order count, peak/min window size.
  *   - UDP request/response RTT, inter-arrival jitter, packet count.
  *
- * Emits tcp_signals / udp_signals events through Suricata's eve-log
+ * Emits tcp_signal / udp_signal events through Suricata's eve-log
  * pipeline. Downstream consumers (e.g. rockfish-perf) join these by
  * flow_id with the standard flow event to derive per-flow odometry.
  */
