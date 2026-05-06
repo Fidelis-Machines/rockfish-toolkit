@@ -35,8 +35,8 @@ outputs:
       types:
         - alert
         - flow
-        - tcp_perf
-        - udp_perf
+        - tcp_signals
+        - udp_signals
         - payload_entropy        # <-- enable this plugin's output
 
 rockfish-payload-entropy:

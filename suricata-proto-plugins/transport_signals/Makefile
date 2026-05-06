@@ -1,8 +1,8 @@
-# Rockfish Suricata Transport Performance Plugin - Makefile
+# Rockfish Suricata Transport Signals Plugin - Makefile
 # Copyright 2025-2026. Fidelis Farm & Technologies, LLC
 # SPDX-License-Identifier: GPL-2.0-only
 
-PLUGIN_NAME = rockfish-transport-perf
+PLUGIN_NAME = rockfish-transport-signals
 
 LIBSURICATA_CONFIG = $(shell which libsuricata-config 2>/dev/null)
 
@@ -24,7 +24,7 @@ LDFLAGS = -shared $(SURICATA_LDFLAGS) -lpthread -ldl -lm
 
 CARGO = cargo
 CARGO_FLAGS = --release
-RUST_LIB = target/release/libsuricata_transport_perf.a
+RUST_LIB = target/release/libsuricata_transport_signals.a
 
 C_SOURCES = plugin.c output.c
 C_OBJECTS = $(C_SOURCES:.c=.o)
@@ -40,14 +40,14 @@ rust:
 
 $(RUST_LIB): rust
 
-%.o: %.c transport-perf.h
+%.o: %.c transport-signals.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(PLUGIN_SO): $(C_OBJECTS) $(RUST_LIB)
 	$(CC) -o $@ $(C_OBJECTS) $(RUST_LIB) $(LDFLAGS)
 
 clean: rust-clean
-	rm -f $(C_OBJECTS) $(PLUGIN_SO) transport_perf_ffi.h
+	rm -f $(C_OBJECTS) $(PLUGIN_SO) transport_signals_ffi.h
 
 rust-clean:
 	$(CARGO) clean

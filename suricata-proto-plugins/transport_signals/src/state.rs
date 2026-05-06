@@ -35,7 +35,7 @@ impl State {
 
     pub fn shutdown(self) {
         crate::log_notice(&format!(
-            "transport-perf shutdown: tcp_flows={} udp_flows={} dropped={}",
+            "transport-signals shutdown: tcp_flows={} udp_flows={} dropped={}",
             self.tcp_flows.len(), self.udp_flows.len(), self.dropped_flows
         ));
     }

@@ -41,7 +41,7 @@ Browse the source on GitHub: <https://github.com/Fidelis-Machines/rockfish-toolk
 
 | Plugin | Emits | Description |
 |---|---|---|
-| [`suricata-proto-plugins/transport_perf/`](suricata-proto-plugins/transport_perf/) | `tcp_perf`, `udp_perf` | Per-flow TCP handshake RTT, retransmits, zero-windows, window stats; UDP request/response RTT and inter-arrival jitter. |
+| [`suricata-proto-plugins/transport_signals/`](suricata-proto-plugins/transport_signals/) | `tcp_signals`, `udp_signals` | Per-flow TCP handshake RTT, retransmits, zero-windows, window stats; UDP request/response RTT and inter-arrival jitter. Downstream consumers derive odometry from these. |
 | [`suricata-proto-plugins/payload_entropy/`](suricata-proto-plugins/payload_entropy/) | `payload_entropy` | Per-flow Shannon entropy, PCR (producer/consumer ratio), and SPLT (Sequence of Packet Lengths and Times). |
 
 ### Protocol parsers (industrial protocols)
@@ -76,7 +76,7 @@ All scripts live in [`scripts/`](scripts/) and must be run from inside the
 | Script | Builds |
 |---|---|
 | [`scripts/build-plugins.sh`](scripts/build-plugins.sh) | All IIoT/OT protocol parsers (or a named subset). |
-| [`scripts/build-perf.sh`](scripts/build-perf.sh) | `transport_perf` only. |
+| [`scripts/build-signals.sh`](scripts/build-signals.sh) | `transport_signals` only. |
 | [`scripts/build-entropy.sh`](scripts/build-entropy.sh) | `payload_entropy` only. |
 | [`scripts/build-rtps.sh`](scripts/build-rtps.sh) | `rtps` parser only. |
 
@@ -89,15 +89,17 @@ The two telemetry plugins are the analytics workhorses of the toolkit —
 they don't decode application protocols, they compute per-flow signals
 that downstream detection engines (HBOS, SIGMA) consume.
 
-### `transport_perf` — Network performance
+### `transport_signals` — Network signal metrics
 
-A Suricata plugin that emits **`tcp_perf`** and **`udp_perf`** events
-alongside Suricata's normal flow records. It tracks the per-flow signals
-you'd normally need a separate APM agent for — handshake latency,
-retransmits, application-level RTT, jitter, DNS health — without
-touching the application stack.
+A Suricata plugin that emits **`tcp_signals`** and **`udp_signals`**
+events alongside Suricata's normal flow records. It tracks the per-flow
+signals you'd normally need a separate APM agent for — handshake
+latency, retransmits, application-level RTT, jitter, DNS health —
+without touching the application stack. Downstream consumers turn these
+into odometry (relative, incremental measurements anchored to the flow's
+first observation) by joining on `flow_id`.
 
-**TCP metrics** (emitted as `tcp_perf` events, one per flow):
+**TCP metrics** (emitted as `tcp_signals` events, one per flow):
 
 | Field | Meaning |
 |---|---|
@@ -108,7 +110,7 @@ touching the application stack.
 | `rst_toserver` / `_toclient` | RST close counts (vs. clean FIN) |
 | `state` | Derived health: `ok`, `drift`, `sla_breach`, `critical` |
 
-**UDP metrics** (emitted as `udp_perf` events):
+**UDP metrics** (emitted as `udp_signals` events):
 
 | Field | Meaning |
 |---|---|
@@ -117,7 +119,7 @@ touching the application stack.
 | `packet_loss_proxy` | Gap heuristic for sequenced UDP (RTP, QUIC) |
 | DNS-specific | Query duration, NXDOMAIN rate, response-code distribution |
 
-**Configuration** (`rockfish-transport-perf:` block in `suricata.yaml`):
+**Configuration** (`rockfish-transport-signals:` block in `suricata.yaml`):
 
 | Key | Default | Description |
 |---|---|---|
@@ -274,7 +276,7 @@ plugins:
   - /opt/suricata/lib/fmadio-ring.so
 
   # Telemetry
-  - /usr/lib/suricata/plugins/rockfish-transport-perf.so
+  - /usr/lib/suricata/plugins/rockfish-transport-signals.so
   - /usr/lib/suricata/plugins/rockfish-payload-entropy.so
 
   # Protocol parsers
@@ -305,8 +307,8 @@ outputs:
         - tls: { extended: yes }
         - http
         # Telemetry plugin events
-        - tcp_perf
-        - udp_perf
+        - tcp_signals
+        - udp_signals
         - payload_entropy
         # Protocol parser events
         - opcua
@@ -315,7 +317,7 @@ outputs:
         - asterix
 
 # 4. Per-plugin tuning (all keys optional — defaults shown)
-rockfish-transport-perf:
+rockfish-transport-signals:
   enabled: yes
   tcp: yes
   udp: yes
@@ -360,7 +362,7 @@ rockfish-toolkit/
 ├── suricata-plugin-fmadio-ring/   # FMADIO ring-buffer capture plugin
 └── suricata-proto-plugins/
     ├── common/                    # Shared headers
-    ├── transport_perf/            # tcp_perf / udp_perf telemetry
+    ├── transport_signals/         # tcp_signals / udp_signals telemetry
     ├── payload_entropy/           # entropy / PCR / SPLT telemetry
     ├── asterix/  bacnet/  canopen/  coap/  enip/  ethercat/
     ├── iec104/   iec61850/  lwm2m/  opcua/  profinet/  s7comm/

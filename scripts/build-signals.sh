@@ -1,14 +1,14 @@
 #!/bin/bash
 # Fidelis Farm & Technologies, LLC / Copyright 2025-2026
 #
-# Build script for the Rockfish Transport Performance Suricata plugin
+# Build script for the Rockfish Transport Signals Suricata plugin
 # (per-flow TCP/UDP RTT, retransmits, zero-windows, jitter).
 #
 # Usage:
-#   ./build-perf.sh              # Build the plugin
-#   ./build-perf.sh --test       # Run Rust unit tests only
-#   ./build-perf.sh --install    # Build and install to /usr/lib/suricata/plugins/
-#   ./build-perf.sh --clean      # Clean build artifacts
+#   ./build-signals.sh              # Build the plugin
+#   ./build-signals.sh --test       # Run Rust unit tests only
+#   ./build-signals.sh --install    # Build and install to /usr/lib/suricata/plugins/
+#   ./build-signals.sh --clean      # Clean build artifacts
 
 set -e
 
@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-PLUGIN_DIR="$TOOLKIT_PROTO_PLUGINS_DIR/transport_perf"
+PLUGIN_DIR="$TOOLKIT_PROTO_PLUGINS_DIR/transport_signals"
 
 # Colors
 RED='\033[0;31m'
@@ -38,7 +38,7 @@ usage() {
     cat << EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Build the Rockfish Transport Performance Suricata plugin.
+Build the Rockfish Transport Signals Suricata plugin.
 
 Captures per-flow TCP/UDP signals not exposed by the standard EVE flow event:
   TCP: handshake RTT, retransmits, out-of-order, zero-window, window stats
@@ -93,7 +93,7 @@ if [ "$DO_TEST" = true ]; then
 fi
 
 # Build the plugin
-info "Building Transport Performance plugin..."
+info "Building Transport Signals plugin..."
 
 # Check for Suricata
 if command -v libsuricata-config &>/dev/null; then
@@ -108,7 +108,7 @@ elif [ -d "${SURICATA_SRC:-/development/suricata}" ]; then
         warn "Falling back to Rust-only build."
         info "Building Rust static library..."
         cargo build --release
-        success "Rust library built: target/release/libsuricata_transport_perf.a"
+        success "Rust library built: target/release/libsuricata_transport_signals.a"
         exit 0
     fi
 else
@@ -116,26 +116,25 @@ else
     warn "Set SURICATA_SRC or install Suricata to build the full .so plugin."
     info "Building Rust static library..."
     cargo build --release
-    success "Rust library built: target/release/libsuricata_transport_perf.a"
+    success "Rust library built: target/release/libsuricata_transport_signals.a"
     exit 0
 fi
 
 make
-success "Plugin built: rockfish-transport-perf.so"
+success "Plugin built: rockfish-transport-signals.so"
 
 if [ "$DO_INSTALL" = true ]; then
     info "Installing plugin..."
     sudo make install
-    success "Installed to /usr/lib/suricata/plugins/rockfish-transport-perf.so"
+    success "Installed to /usr/lib/suricata/plugins/rockfish-transport-signals.so"
     echo ""
     info "Add to suricata.yaml:"
     echo "  plugins:"
-    echo "    - /usr/lib/suricata/plugins/rockfish-transport-perf.so"
+    echo "    - /usr/lib/suricata/plugins/rockfish-transport-signals.so"
     echo ""
-    echo "  rockfish-transport-perf:"
+    echo "  rockfish-transport-signals:"
     echo "    enabled: yes"
     echo "    tcp: yes"
     echo "    udp: yes"
-    echo "    output-file: /var/log/suricata/transport_perf.json"
-    echo "    # See suricata-proto-plugins/transport_perf/README.md for all options"
+    echo "    # See suricata-proto-plugins/transport_signals/README.md for all options"
 fi

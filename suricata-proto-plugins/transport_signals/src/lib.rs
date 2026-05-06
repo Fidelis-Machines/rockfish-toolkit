@@ -1,6 +1,6 @@
 // Fidelis Farm & Technologies, LLC / Copyright 2025-2026
 // SPDX-License-Identifier: GPL-2.0-only
-//! Rockfish Suricata Transport Performance plugin (Rust side).
+//! Rockfish Suricata Transport Signals plugin (Rust side).
 //!
 //! Maintains per-flow TCP/UDP state and computes derived metrics
 //! (handshake RTT, retransmits, zero-windows, UDP request/response RTT,
@@ -59,7 +59,7 @@ pub extern "C" fn rs_tp_init(config_json: *const c_char) -> c_int {
         }
     };
     *STATE.lock() = Some(State::new(cfg));
-    log_notice("transport-perf state initialized");
+    log_notice("transport-signals state initialized");
     0
 }
 
@@ -68,7 +68,7 @@ pub extern "C" fn rs_tp_deinit() {
     if let Some(state) = STATE.lock().take() {
         state.shutdown();
     }
-    log_notice("transport-perf state torn down");
+    log_notice("transport-signals state torn down");
 }
 
 fn copy_addr(src: *const u8, len: u32) -> [u8; ADDR_BUF] {

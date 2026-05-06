@@ -1,11 +1,11 @@
-/* Rockfish Suricata Transport Performance Plugin - Output
+/* Rockfish Suricata Transport Signals Plugin - Output
  * Copyright 2025-2026. Fidelis Farm & Technologies, LLC
  * SPDX-License-Identifier: GPL-2.0-only
  *
- * Emits tcp_perf and udp_perf events through Suricata's own eve-log
+ * Emits tcp_signals and udp_signals events through Suricata's own eve-log
  * subsystem. The plugin does NOT manage its own output destination —
- * users enable it under `eve-log.types: [tcp_perf, udp_perf]` and the
- * events flow to whatever filetype eve-log is configured for (regular
+ * users enable it under `eve-log.types: [tcp_signals, udp_signals]` and
+ * the events flow to whatever filetype eve-log is configured for (regular
  * file, unix_dgram, unix_stream, redis, syslog).
  */
 
@@ -23,7 +23,7 @@
 #include "decode.h"
 #include "rust.h"
 
-#include "transport-perf.h"
+#include "transport-signals.h"
 
 /* ============================================================================
  * Rust FFI — state management
@@ -115,8 +115,8 @@ extern uint8_t rs_tp_take_udp_stats(uint64_t flow_hash, TpUdpStats *out);
  * Logging shims (used by Rust FFI)
  * ========================================================================= */
 
-void tp_log_notice(const char *m) { SCLogNotice("transport-perf: %s", m); }
-void tp_log_error(const char *m)  { SCLogError("transport-perf: %s", m); }
+void tp_log_notice(const char *m) { SCLogNotice("transport-signals: %s", m); }
+void tp_log_error(const char *m)  { SCLogError("transport-signals: %s", m); }
 
 /* ============================================================================
  * Plugin state
@@ -230,9 +230,9 @@ static int TpPacketLogger(ThreadVars *tv, void *thread_data, const Packet *p)
  * eve sub-loggers — emit JSON via Suricata's eve writer
  * ========================================================================= */
 
-static void emit_tcp_perf(SCJsonBuilder *jb, const TpTcpStats *s)
+static void emit_tcp_signals(SCJsonBuilder *jb, const TpTcpStats *s)
 {
-    SCJbOpenObject(jb, "tcp_perf");
+    SCJbOpenObject(jb, "tcp_signals");
     SCJbSetUint(jb, "start_us",     (uint64_t)s->start_us);
     SCJbSetUint(jb, "end_us",       (uint64_t)s->end_us);
     SCJbSetUint(jb, "duration_us",  (uint64_t)s->duration_us);
@@ -278,12 +278,12 @@ static void emit_tcp_perf(SCJsonBuilder *jb, const TpTcpStats *s)
     }
 
     SCJbSetString(jb, "close_reason", (const char *)s->close_reason);
-    SCJbClose(jb);   /* tcp_perf */
+    SCJbClose(jb);   /* tcp_signals */
 }
 
-static void emit_udp_perf(SCJsonBuilder *jb, const TpUdpStats *s)
+static void emit_udp_signals(SCJsonBuilder *jb, const TpUdpStats *s)
 {
-    SCJbOpenObject(jb, "udp_perf");
+    SCJbOpenObject(jb, "udp_signals");
     SCJbSetUint(jb, "start_us",     (uint64_t)s->start_us);
     SCJbSetUint(jb, "end_us",       (uint64_t)s->end_us);
     SCJbSetUint(jb, "duration_us",  (uint64_t)s->duration_us);
@@ -312,7 +312,7 @@ static void emit_udp_perf(SCJsonBuilder *jb, const TpUdpStats *s)
         if (s->has_iat_stddev_ts) SCJbSetFloat(jb, "iat_stddev_toserver_us", s->iat_stddev_toserver_us);
         if (s->has_iat_stddev_tc) SCJbSetFloat(jb, "iat_stddev_toclient_us", s->iat_stddev_toclient_us);
     }
-    SCJbClose(jb);   /* udp_perf */
+    SCJbClose(jb);   /* udp_signals */
 }
 
 static SCJsonBuilder *build_eve_header_for_flow(const Flow *f, const char *event_type)
@@ -355,10 +355,10 @@ static int TpTcpFlowLogger(ThreadVars *tv, void *thread_data, Flow *f)
     if (!rs_tp_take_tcp_stats(f->flow_hash, &stats) || !stats.valid) return 0;
 
     OutputJsonThreadCtx *thread = thread_data;
-    SCJsonBuilder *jb = build_eve_header_for_flow(f, "tcp_perf");
+    SCJsonBuilder *jb = build_eve_header_for_flow(f, "tcp_signals");
     if (jb == NULL) return 0;
 
-    emit_tcp_perf(jb, &stats);
+    emit_tcp_signals(jb, &stats);
     OutputJsonBuilderBuffer(tv, NULL, f, jb, thread);
     SCJbFree(jb);
     return 0;
@@ -375,10 +375,10 @@ static int TpUdpFlowLogger(ThreadVars *tv, void *thread_data, Flow *f)
     if (!rs_tp_take_udp_stats(f->flow_hash, &stats) || !stats.valid) return 0;
 
     OutputJsonThreadCtx *thread = thread_data;
-    SCJsonBuilder *jb = build_eve_header_for_flow(f, "udp_perf");
+    SCJsonBuilder *jb = build_eve_header_for_flow(f, "udp_signals");
     if (jb == NULL) return 0;
 
-    emit_udp_perf(jb, &stats);
+    emit_udp_signals(jb, &stats);
     OutputJsonBuilderBuffer(tv, NULL, f, jb, thread);
     SCJbFree(jb);
     return 0;
@@ -426,7 +426,7 @@ static int json_int(char *buf, int off, int cap, int *first,
     return off + n;
 }
 
-void RockfishTransportPerfRegister(void)
+void RockfishTransportSignalsRegister(void)
 {
     int  enabled              = 1;
     int  tcp_enabled          = 1;
@@ -442,7 +442,7 @@ void RockfishTransportPerfRegister(void)
     int  emit_udp_rtt         = 1;
     int  emit_udp_jitter      = 1;
 
-    SCConfNode *conf = SCConfGetNode("rockfish-transport-perf");
+    SCConfNode *conf = SCConfGetNode("rockfish-transport-signals");
     if (conf != NULL) {
         intmax_t ival;
         int bval;
@@ -467,11 +467,11 @@ void RockfishTransportPerfRegister(void)
     }
 
     if (!enabled) {
-        SCLogNotice("Rockfish Transport Performance disabled by configuration");
+        SCLogNotice("Rockfish Transport Signals disabled by configuration");
         return;
     }
     if (!tcp_enabled && !udp_enabled) {
-        SCLogNotice("Rockfish Transport Performance: tcp and udp both disabled — not registering");
+        SCLogNotice("Rockfish Transport Signals: tcp and udp both disabled — not registering");
         return;
     }
 
@@ -503,39 +503,39 @@ void RockfishTransportPerfRegister(void)
     }
 
     if (rs_tp_init(cfg) != 0) {
-        SCLogError("Failed to initialize transport-perf state");
+        SCLogError("Failed to initialize transport-signals state");
         return;
     }
     g_tp_initialized = true;
 
     /* ── Packet logger (state updates) ──────────────────────────────── */
-    if (SCOutputRegisterPacketLogger(LOGGER_USER, "RockfishTransportPerfPkt",
+    if (SCOutputRegisterPacketLogger(LOGGER_USER, "RockfishTransportSignalsPkt",
                                       TpPacketLogger, TpPacketCondition,
                                       NULL, TpPacketThreadInit, TpPacketThreadDeinit) != 0) {
-        SCLogError("Failed to register transport-perf packet logger");
+        SCLogError("Failed to register transport-signals packet logger");
         rs_tp_deinit();
         g_tp_initialized = false;
         return;
     }
 
-    /* ── eve sub-modules: tcp_perf, udp_perf ───────────────────────── */
+    /* ── eve sub-modules: tcp_signals, udp_signals ─────────────────── */
     if (tcp_enabled) {
         OutputRegisterFlowSubModule(LOGGER_USER, "eve-log",
-            "RockfishTcpPerfLog", "eve-log.tcp_perf",
+            "RockfishTcpSignalsLog", "eve-log.tcp_signals",
             OutputJsonLogInitSub, TpTcpFlowLogger,
             JsonLogThreadInit, JsonLogThreadDeinit);
     }
     if (udp_enabled) {
         OutputRegisterFlowSubModule(LOGGER_USER, "eve-log",
-            "RockfishUdpPerfLog", "eve-log.udp_perf",
+            "RockfishUdpSignalsLog", "eve-log.udp_signals",
             OutputJsonLogInitSub, TpUdpFlowLogger,
             JsonLogThreadInit, JsonLogThreadDeinit);
     }
 
     /* ── Startup banner ────────────────────────────────────────────── */
     SCLogNotice("════════════════════════════════════════════════════════════");
-    SCLogNotice("  Rockfish Transport Performance v%s — LOADED",
-                ROCKFISH_TRANSPORT_PERF_VERSION);
+    SCLogNotice("  Rockfish Transport Signals v%s — LOADED",
+                ROCKFISH_TRANSPORT_SIGNALS_VERSION);
     SCLogNotice("    TCP:               %s", tcp_enabled ? "enabled" : "disabled");
     SCLogNotice("    UDP:               %s", udp_enabled ? "enabled" : "disabled");
     SCLogNotice("    Sample rate:       1/%u", (unsigned)sample_n);
@@ -551,9 +551,9 @@ void RockfishTransportPerfRegister(void)
                 emit_udp_rtt       ? "yes" : "no",
                 emit_udp_jitter    ? "yes" : "no");
     SCLogNotice("    Events:            %s%s%s%s",
-                tcp_enabled ? "tcp_perf" : "",
+                tcp_enabled ? "tcp_signals" : "",
                 tcp_enabled && udp_enabled ? ", " : "",
-                udp_enabled ? "udp_perf" : "",
+                udp_enabled ? "udp_signals" : "",
                 (!tcp_enabled && !udp_enabled) ? "(none — both disabled)" : "");
     SCLogNotice("    Output:            via eve-log (add types to your eve-log.types list)");
     SCLogNotice("════════════════════════════════════════════════════════════");

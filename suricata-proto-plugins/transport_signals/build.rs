@@ -7,6 +7,6 @@ fn main() {
         .with_config(config)
         .generate()
     {
-        bindings.write_to_file("transport_perf_ffi.h");
+        bindings.write_to_file("transport_signals_ffi.h");
     }
 }

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 //! Plugin configuration deserialized from suricata.yaml via a JSON bridge.
 //!
-//! This plugin emits `tcp_perf` and `udp_perf` events through Suricata's
-//! own eve-log writer (no separate file/socket of its own) — the user
-//! enables it under `eve-log.types:` like any other event type.
+//! This plugin emits `tcp_signals` and `udp_signals` events through
+//! Suricata's own eve-log writer (no separate file/socket of its own) —
+//! the user enables it under `eve-log.types:` like any other event type.
 
 use serde::Deserialize;
 

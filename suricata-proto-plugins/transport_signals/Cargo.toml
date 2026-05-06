@@ -1,15 +1,15 @@
 [workspace]
 
 [package]
-name = "suricata-transport-perf"
+name = "suricata-transport-signals"
 version = "0.1.0"
 edition = "2021"
 authors = ["Fidelis Farm & Technologies, LLC"]
 license = "GPL-2.0-only"
-description = "Suricata packet-logger plugin: per-flow TCP/UDP performance metrics (handshake RTT, retransmits, zero-windows, UDP request/response RTT)"
+description = "Suricata packet-logger plugin: per-flow TCP/UDP signal metrics (handshake RTT, retransmits, zero-windows, UDP request/response RTT)"
 
 [lib]
-name = "suricata_transport_perf"
+name = "suricata_transport_signals"
 crate-type = ["staticlib"]
 
 [dependencies]

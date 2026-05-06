@@ -1,7 +1,7 @@
-# Rockfish Suricata Transport Performance Plugin
+# Rockfish Suricata Transport Signals Plugin
 
-Per-flow TCP and UDP performance metrics, emitted as `tcp_perf` and
-`udp_perf` events through Suricata's normal eve-log pipeline. Whatever
+Per-flow TCP and UDP signal metrics, emitted as `tcp_signals` and
+`udp_signals` events through Suricata's normal eve-log pipeline. Whatever
 `filetype:` your eve-log uses (regular file, unix_dgram, unix_stream,
 syslog, redis) — these events go there too, mixed in with your existing
 flow / dns / tls events.
@@ -16,6 +16,10 @@ flow / dns / tls events.
 | RST / FIN counts        |                                   |
 | Termination reason (`fin` / `rst` / `timeout`) |        |
 
+Downstream consumers (e.g. `rockfish-perf`) join these by `flow_id` with
+the standard `flow` event to derive per-flow odometry — relative,
+incremental measurements anchored to the flow's first observation.
+
 ## Build
 
 ```sh
@@ -24,17 +28,17 @@ SURICATA_SRC=/path/to/configured/suricata-src make
 make
 ```
 
-The result is `rockfish-transport-perf.so`.
+The result is `rockfish-transport-signals.so`.
 
 ## Install
 
 Copy the `.so` into Suricata's plugin directory and reference it from
-`suricata.yaml`. Then enable `tcp_perf` and `udp_perf` under your existing
-`eve-log.types:` list — that's it.
+`suricata.yaml`. Then enable `tcp_signals` and `udp_signals` under your
+existing `eve-log.types:` list — that's it.
 
 ```yaml
 plugins:
-  - /usr/lib/suricata/plugins/rockfish-transport-perf.so
+  - /usr/lib/suricata/plugins/rockfish-transport-signals.so
 
 outputs:
   - eve-log:
@@ -47,12 +51,12 @@ outputs:
         - dns
         - tls:
             extended: yes
-        # ── Transport perf events ────────────────────────────────
-        - tcp_perf
-        - udp_perf
+        # ── Transport signals events ─────────────────────────────
+        - tcp_signals
+        - udp_signals
 
 # Optional plugin tuning (all keys optional, defaults shown).
-rockfish-transport-perf:
+rockfish-transport-signals:
   enabled: yes
   tcp: yes
   udp: yes
@@ -80,17 +84,15 @@ Sample TCP record (lives in the same eve stream as flow/dns/tls):
 {
   "timestamp": "2026-04-28T17:32:11.018452Z",
   "flow_id": 17628341205823,
-  "event_type": "tcp_perf",
+  "event_type": "tcp_signals",
   "src_ip": "10.1.2.45", "src_port": 49215,
   "dest_ip": "10.1.2.10", "dest_port": 443,
   "proto": "TCP",
-  "tcp_perf": {
+  "tcp_signals": {
     "start_us": 1748365931018452,
     "end_us":   1748365941312009,
     "duration_us": 10293557,
     "handshake_rtt_us": 1842,
-    "pkts_toserver": 84,  "pkts_toclient": 71,
-    "bytes_toserver": 7224, "bytes_toclient": 11502,
     "retransmits_toserver": 1,
     "avg_window_toclient": 64240,
     "min_window_toclient": 60128,
@@ -107,16 +109,14 @@ Sample UDP record:
 {
   "timestamp": "2026-04-28T17:32:11.118452Z",
   "flow_id": 17628341219991,
-  "event_type": "udp_perf",
+  "event_type": "udp_signals",
   "src_ip": "10.1.2.45", "src_port": 53412,
   "dest_ip": "10.1.2.1", "dest_port": 53,
   "proto": "UDP",
-  "udp_perf": {
+  "udp_signals": {
     "start_us": 1748365931118452,
     "end_us":   1748365931145812,
     "duration_us": 27360,
-    "pkts_toserver": 1, "pkts_toclient": 1,
-    "bytes_toserver": 64, "bytes_toclient": 188,
     "rtt_count": 1,
     "rtt_min_us": 27188, "rtt_max_us": 27188,
     "rtt_avg_us": 27188.0
@@ -124,19 +124,22 @@ Sample UDP record:
 }
 ```
 
+Per-direction packet/byte counts are not duplicated here — they live on
+the standard `flow` event for the same `flow_id`.
+
 ## How rockfish-perf consumes this
 
-`rockfish-perf` reads the Suricata eve socket and now sees `tcp_perf` /
-`udp_perf` mixed in with `flow` / `dns`. The fields surface in the
+`rockfish-perf` reads the Suricata eve socket and now sees `tcp_signals`
+/ `udp_signals` mixed in with `flow` / `dns`. The fields surface in the
 per-asset feature vector as:
 
-| Feature                    | Source                             |
-|----------------------------|-----------------------------------|
-| `tcp_handshake_rtt_ms_avg` | `tcp_perf.handshake_rtt_us`       |
-| `tcp_retransmit_ratio`     | retransmits / packets             |
-| `tcp_zero_window_ratio`    | zero_window / packets             |
-| `tcp_out_of_order_ratio`   | out_of_order / packets            |
-| `udp_rtt_avg_ms`           | `udp_perf.rtt_avg_us`             |
+| Feature                    | Source                                |
+|----------------------------|---------------------------------------|
+| `tcp_handshake_rtt_ms_avg` | `tcp_signals.handshake_rtt_us`        |
+| `tcp_retransmit_ratio`     | retransmits / packets                 |
+| `tcp_zero_window_ratio`    | zero_window / packets                 |
+| `tcp_out_of_order_ratio`   | out_of_order / packets                |
+| `udp_rtt_avg_ms`           | `udp_signals.rtt_avg_us`              |
 | `udp_jitter_avg_ms`        | mean of per-direction `iat_stddev_us` |
 
 These dimensions are added to the HBOS drift baseline automatically.
