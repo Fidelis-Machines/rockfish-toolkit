@@ -1,0 +1,8 @@
+fmadio_ring_ffi.h
+/target/
+Cargo.lock
+*.swp
+*.swo
+*.so
+*.o
+.DS_Store

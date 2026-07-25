@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark only">
+<title>{{ site.title | default: page.title | default: site.github.repository_name }}</title>
+{% if site.description %}<meta name="description" content="{{ site.description }}">{% endif %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+{% seo %}
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    color-scheme: dark only;
+    --bg:        #0a0a0a;
+    --fg:        #e8e8e8;
+    --fg-dim:    rgba(255,255,255,.65);
+    --fg-muted:  rgba(255,255,255,.35);
+    --copper:    #B87333;
+    --copper-h:  #d4894a;
+    --border:    rgba(255,255,255,.08);
+    --surface:   rgba(255,255,255,.03);
+    --code-bg:   #0d0d0d;
+  }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.65;
+  }
+  body { min-height: 100vh; }
+
+  header.page-header {
+    border-bottom: 1px solid var(--border);
+    padding: 36px 24px 28px;
+    text-align: center;
+  }
+  header.page-header .copper-rule {
+    display: block;
+    width: 80px;
+    height: 2px;
+    background: var(--copper);
+    margin: 0 auto 16px;
+  }
+  header.page-header h1 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--fg);
+  }
+  header.page-header .tagline {
+    font-size: .95rem;
+    color: var(--fg-dim);
+    margin-top: 6px;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  header.page-header .header-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+  header.page-header .header-actions a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    font-size: .85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: border-color .2s, background .2s;
+  }
+  header.page-header .header-actions a:hover {
+    border-color: var(--copper);
+    background: rgba(184,115,51,.08);
+  }
+  header.page-header .header-actions a.primary {
+    background: var(--copper);
+    border-color: var(--copper);
+    color: #fff;
+  }
+  header.page-header .header-actions a.primary:hover {
+    background: var(--copper-h);
+  }
+  header.page-header svg { width: 16px; height: 16px; }
+
+  main.content {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+
+  /* Markdown content */
+  main.content h1,
+  main.content h2,
+  main.content h3,
+  main.content h4,
+  main.content h5,
+  main.content h6 {
+    color: var(--fg);
+    font-weight: 700;
+    margin: 32px 0 12px;
+    letter-spacing: -.015em;
+  }
+  main.content h1 { font-size: 1.8rem; }
+  main.content h2 {
+    font-size: 1.35rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-top: 44px;
+  }
+  main.content h3 { font-size: 1.1rem; color: var(--copper); margin-top: 28px; }
+  main.content h4 { font-size: 1rem; }
+
+  main.content p, main.content li, main.content dd {
+    color: var(--fg-dim);
+  }
+  main.content p { margin: 12px 0; }
+  main.content strong, main.content b { color: var(--fg); font-weight: 600; }
+  main.content em { font-style: italic; }
+
+  main.content a {
+    color: var(--copper);
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(184,115,51,.4);
+  }
+  main.content a:hover {
+    color: var(--copper-h);
+    border-bottom-color: var(--copper-h);
+  }
+
+  main.content ul, main.content ol { margin: 12px 0 12px 24px; }
+  main.content li { margin: 4px 0; }
+
+  main.content code {
+    background: var(--surface);
+    color: var(--copper);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, Menlo, monospace;
+    font-size: 0.9em;
+  }
+
+  main.content pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin: 16px 0;
+    overflow-x: auto;
+    line-height: 1.55;
+  }
+  main.content pre code {
+    background: transparent;
+    border: none;
+    color: var(--fg);
+    padding: 0;
+    font-size: .88em;
+  }
+
+  main.content table {
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+    margin: 16px 0;
+    font-size: .92rem;
+  }
+  main.content th {
+    background: rgba(184,115,51,.12);
+    color: var(--copper);
+    border-bottom: 1px solid var(--copper);
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: .9rem;
+  }
+  main.content td {
+    border-top: 1px solid var(--border);
+    padding: 9px 14px;
+    color: var(--fg-dim);
+    vertical-align: top;
+  }
+  main.content tr:nth-child(even) td { background: rgba(255,255,255,.012); }
+
+  main.content blockquote {
+    border-left: 3px solid var(--copper);
+    background: rgba(184,115,51,.05);
+    color: var(--fg-dim);
+    padding: 8px 18px;
+    margin: 16px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  main.content blockquote p { margin: 6px 0; }
+
+  main.content hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+
+  main.content img { max-width: 100%; height: auto; border-radius: 8px; }
+
+  /* Center-aligned shortcuts often used in READMEs */
+  main.content p[align="center"] { text-align: center; }
+  main.content p[align="center"] a { border-bottom: none; }
+
+  footer.site-footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 32px;
+    text-align: center;
+    color: var(--fg-muted);
+    font-size: .85rem;
+  }
+  footer.site-footer a { color: var(--fg-dim); }
+  footer.site-footer a:hover { color: var(--copper); }
+
+  ::selection { background: rgba(184,115,51,.4); color: #fff; }
+
+  @media (max-width: 720px) {
+    header.page-header { padding: 28px 20px 22px; }
+    main.content { padding: 28px 22px 60px; }
+    main.content table { font-size: .85rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <span class="copper-rule"></span>
+  <h1>{{ site.title | default: site.github.repository_name }}</h1>
+  {% if site.description %}<p class="tagline">{{ site.description }}</p>{% endif %}
+  <div class="header-actions">
+    <a href="https://github.com/Fidelis-Machines/rockfish-toolkit" class="primary" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      View on GitHub
+    </a>
+    <a href="https://github.com/Fidelis-Machines/rockfish-toolkit/archive/refs/heads/main.zip" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download ZIP
+    </a>
+    <a href="https://docs.rockfishndr.com/" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Documentation
+    </a>
+  </div>
+</header>
+
+<main class="content">
+  {{ content }}
+</main>
+
+<footer class="site-footer">
+  &copy; 2025&ndash;2026 Fidelis Farm &amp; Technologies, LLC &middot;
+  <a href="https://rockfishndr.com/">rockfishndr.com</a> &middot;
+  <a href="https://github.com/{{ site.github.repository_nwo }}">GitHub</a>
+</footer>
+
+</body>
+</html>

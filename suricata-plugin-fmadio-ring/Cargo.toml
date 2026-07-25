@@ -1,0 +1,23 @@
+[workspace]
+
+[package]
+name = "suricata-fmadio-ring"
+version = "0.1.0"
+edition = "2021"
+authors = ["Fidelis Farm & Technologies, LLC"]
+license = "GPL-2.0-only"
+description = "FMADIO Ring Buffer capture plugin for Suricata"
+
+[lib]
+name = "suricata_fmadio_ring"
+crate-type = ["staticlib"]
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[profile.release]
+lto = true
+opt-level = 3

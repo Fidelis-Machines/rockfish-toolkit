@@ -1,0 +1,32 @@
+[workspace]
+
+[package]
+name = "suricata-profinet-parser"
+version = "0.1.0"
+edition = "2021"
+authors = ["Fidelis Farm & Technologies, LLC"]
+license = "GPL-2.0-only"
+description = "Suricata application-layer parser plugin for PROFINET DCP protocol"
+
+[lib]
+name = "suricata_profinet_parser"
+crate-type = ["staticlib"]
+
+[dependencies]
+libc = "0.2"
+nom = "7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# NOTE: The `suricata` crate is provided by the Suricata build tree.
+# When building as an in-tree parser, it is available via path dependency.
+# When building as an out-of-tree plugin, Suricata headers are used via C FFI.
+# Uncomment the following if building against a published suricata crate:
+# suricata = "8"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[profile.release]
+opt-level = 3
+lto = true

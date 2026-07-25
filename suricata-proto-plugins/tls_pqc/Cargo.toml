@@ -1,0 +1,27 @@
+[workspace]
+
+[package]
+name = "suricata-tls-pqc"
+version = "0.1.0"
+edition = "2021"
+authors = ["Fidelis Farm & Technologies, LLC"]
+license = "GPL-2.0-only"
+description = "Suricata TLS plugin: per-handshake post-quantum key-exchange classification (ClientHello supported_groups + TLS 1.3 ServerHello key_share), per NIST IR 8547"
+
+[lib]
+name = "suricata_tls_pqc"
+# staticlib produces the `.a` linked into the .so by the C side;
+# rlib lets the integration tests under tests/ link the Rust symbols.
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[profile.release]
+opt-level = 3
+lto = true
