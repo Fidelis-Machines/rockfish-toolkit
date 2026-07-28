@@ -2,7 +2,7 @@
   <a href="https://rockfishndr.com" title="Rockfish NDR — learn more"><img src="https://rockfishndr.com/rockfish-logo.png" alt="Rockfish NDR" width="320"></a>
 </p>
 
-<h2 align="center">Rockfish Toolkit</h2>
+<h2 align="center">Rockfish Deployment Toolkit</h2>
 
 <p align="center">
   <a href="https://docs.rockfishndr.com/">Documentation</a> &middot;
