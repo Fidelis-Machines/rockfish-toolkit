@@ -25,7 +25,7 @@
 
 ## Description
 
-Rockfish Toolkit is the **integration toolkit for [Rockfish NDR](https://rockfishndr.com)** — the open layer that connects the sensor to its environment. The core NDR engine ships separately; this repo is everything around it, organized by integration stage:
+Rockfish Toolkit is the **deployment toolkit for [Rockfish NDR](https://rockfishndr.com)** — everything around the core engine you need to stand up a sensor in production: line-rate capture, IIoT/OT protocol decode, per-flow telemetry, and packaged deployment. The NDR detection engine ships separately; the toolkit is the open layer around it, organized by stage:
 
 | Stage | What it does | In the toolkit |
 |---|---|---|
