@@ -15,7 +15,7 @@
 
 | Stage | Functions |
 |---|---|
-| **Deploy** ⭐ | [Quick install](#quick-install) &middot; [Run RockfishNDR in Docker](#run-rockfish-in-docker) |
+| **Deploy** ⭐ | [Quick install](#quick-install) &middot; [`install/install.sh` (installer + verify)](install/) &middot; [Run RockfishNDR in Docker](#run-rockfish-in-docker) |
 | **Capture** | [FMADIO ring **Suricata capture plugin**](#suricata-capture-plugin) |
 | **Decode** | [OT / IIoT protocol **Suricata plugins**](#suricata-protocol-plugins-industrial-protocols) |
 | **Telemetry** | [`UDP/TCP metrics` **Suricata plugin**](#transport_signals--network-signal-metrics) |
@@ -49,23 +49,32 @@ one command. The installer auto-detects your platform — APT on Debian/Ubuntu,
 Docker elsewhere:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Fidelis-Machines/rockfish-toolkit/main/install.sh | bash
+curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+```
+
+**Verify** an install at any time — read-only diagnostics that exit non-zero if
+anything is missing:
+
+```bash
+curl -fsSL https://docs.rockfishndr.com/install.sh | bash -s -- verify
 ```
 
 Options:
 
 ```bash
 # Pin a specific version
-ROCKFISH_VERSION=2026.07.6 curl -fsSL https://raw.githubusercontent.com/Fidelis-Machines/rockfish-toolkit/main/install.sh | bash
+ROCKFISH_VERSION=2026.07.6 curl -fsSL https://docs.rockfishndr.com/install.sh | bash
 
 # Force a method (apt or docker)
-ROCKFISH_METHOD=apt    curl -fsSL https://raw.githubusercontent.com/Fidelis-Machines/rockfish-toolkit/main/install.sh | bash
-ROCKFISH_METHOD=docker curl -fsSL https://raw.githubusercontent.com/Fidelis-Machines/rockfish-toolkit/main/install.sh | bash
+ROCKFISH_METHOD=apt    curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+ROCKFISH_METHOD=docker curl -fsSL https://docs.rockfishndr.com/install.sh | bash
 ```
 
-The same script lives in this repo at [`install.sh`](install.sh) — read it
-before piping to a shell, or run it after cloning. It installs only the
-**engine**; build and load the **Suricata plugins** below to feed it. See the
+The authoritative script lives in this repo at [`install/install.sh`](install/install.sh)
+(the docs URL above serves a synced copy) — read it before piping to a shell,
+or run it after cloning. Full write-up: [`install/README.md`](install/README.md).
+It installs only the **engine**; build and load the **Suricata plugins** below
+to feed it. See the
 [installation docs](https://docs.rockfishndr.com/getting-started/installation.html).
 
 ## Get the code
@@ -480,7 +489,9 @@ schemas, and example queries.
 
 ```
 rockfish-toolkit/
-├── install.sh                     # Deploy: one-line engine installer (APT / Docker)
+├── install/                       # Deploy: one-line engine installer + verify
+│   ├── install.sh                 #   authoritative installer (install | verify)
+│   └── README.md                  #   installer documentation
 ├── docker/                        # Deploy: Dockerfile + README to run the rockfish CLI
 ├── integrations/                  # Respond: response-pipeline recipes (coming soon)
 │   ├── mqtt/                       #   MQTT → OT/SCADA broker
