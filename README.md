@@ -4,6 +4,8 @@
 
 <h2 align="center">Rockfish Deployment Toolkit</h2>
 
+<p align="center"><em>The Suricata plugins &amp; deployment kit that integrate Suricata with Rockfish NDR.</em></p>
+
 <p align="center">
   <a href="https://docs.rockfishndr.com/">Documentation</a> &middot;
   <a href="https://github.com/Fidelis-Machines/rockfish-toolkit/issues">Issues</a>
@@ -14,24 +16,24 @@
 | Stage | Functions |
 |---|---|
 | **Deploy** ⭐ | [Run RockfishNDR in Docker](#run-rockfish-in-docker) |
-| **Capture** | [FMADIO ring capture plugin](#capture-plugin) |
-| **Decode** | [OT / IIoT protocol parsers](#protocol-parsers-industrial-protocols) |
-| **Telemetry** | [`UDP/TCP metrics`](#transport_signals--network-signal-metrics) |
-| **ETA** | [Encrypted Traffic Analysis (ETA)](#payload_entropy--encrypted-traffic-analysis) |
-| **PQC** | [Post-quantum cryptography (PQC) compliance](#tls_pqc--post-quantum-cryptography-pqc-compliance) ([NIST IR 8547](https://csrc.nist.gov/pubs/ir/8547/final)) |
+| **Capture** | [FMADIO ring **Suricata capture plugin**](#suricata-capture-plugin) |
+| **Decode** | [OT / IIoT protocol **Suricata plugins**](#suricata-protocol-plugins-industrial-protocols) |
+| **Telemetry** | [`UDP/TCP metrics` **Suricata plugin**](#transport_signals--network-signal-metrics) |
+| **ETA** | [Encrypted Traffic Analysis (ETA) **Suricata plugin**](#payload_entropy--encrypted-traffic-analysis) |
+| **PQC** | [Post-quantum cryptography (PQC) **Suricata plugin**](#tls_pqc--post-quantum-cryptography-pqc-compliance) ([NIST IR 8547](https://csrc.nist.gov/pubs/ir/8547/final)) |
 | **Respond** *(coming soon)* | [Response pipeline integrations](integrations/) &middot; [MQTT](integrations/mqtt/) &middot; [Kafka](integrations/kafka/) &middot; [Webhook](integrations/webhook/) |
 
 **Reference:** [Build scripts](#build-scripts) &middot; [Requirements](#requirements) &middot; [Building](#building) &middot; [Repository layout](#repository-layout)
 
 ## Description
 
-Rockfish Toolkit is the **deployment toolkit for [Rockfish NDR](https://rockfishndr.com)** — everything around the core engine you need to stand up a sensor in production: line-rate capture, IIoT/OT protocol decode, per-flow telemetry, and packaged deployment. The NDR detection engine ships separately; the toolkit is the open layer around it, organized by stage:
+Rockfish Toolkit is the **Suricata deployment kit for [Rockfish NDR](https://rockfishndr.com)** — the **Suricata plugins** and packaging that integrate Suricata with the Rockfish NDR engine and stand up a sensor in production. Everything here extends Suricata: a line-rate **capture plugin**, **protocol-decode plugins** for IIoT/OT, and **telemetry plugins** for per-flow signals, encrypted-traffic analytics (ETA), and post-quantum (PQC) compliance — all emitting through Suricata's `eve-log` — plus a Docker/APT deployment recipe. The NDR detection engine ships separately; the toolkit is the open **Suricata-integration layer** around it, organized by stage:
 
 | Stage | What it does | In the toolkit |
 |---|---|---|
-| **Capture** | Get packets in at line rate | FMADIO shared-memory ring capture plugin |
-| **Decode** | Parse IIoT/OT protocols Suricata doesn't ship | S7comm, OPC UA, BACnet, IEC 61850/104, PROFINET, EtherCAT, ENIP, … |
-| **Telemetry** | Compute the per-flow signals the detection engines consume | Transport signals (odometry), Encrypted Traffic Analytics (entropy / SPLT), Post-quantum cryptography (PQC) compliance |
+| **Capture** | Get packets in at line rate | FMADIO shared-memory ring **Suricata capture plugin** |
+| **Decode** | Parse IIoT/OT protocols Suricata doesn't ship | **Suricata protocol plugins:** S7comm, OPC UA, BACnet, IEC 61850/104, PROFINET, EtherCAT, ENIP, … |
+| **Telemetry** | Compute the per-flow signals the detection engines consume | **Suricata plugins:** transport signals (odometry), Encrypted Traffic Analytics / entropy (ETA), post-quantum cryptography (PQC) compliance |
 | **Deploy** | Run the published release without a source build | Docker recipe that pulls `rockfish` from the APT repo |
 | **Respond** *(coming soon)* | Wire detections into your response & automation stack | Integration hooks / recipes for MQTT, Kafka, webhooks, SOAR |
 
@@ -51,13 +53,13 @@ Browse the source on GitHub: <https://github.com/Fidelis-Machines/rockfish-toolk
 
 ## Components
 
-### Capture plugin
+### Suricata capture plugin
 
 | Plugin | Description |
 |---|---|
 | [`suricata-plugin-fmadio-ring/`](suricata-plugin-fmadio-ring/) | Zero-copy packet capture from FMADIO shared-memory ring buffers (`/opt/fmadio/queue/lxc_ring*`). One worker thread per ring. |
 
-### Telemetry plugins
+### Suricata telemetry plugins
 
 | Plugin | Emits | Description |
 |---|---|---|
@@ -65,7 +67,7 @@ Browse the source on GitHub: <https://github.com/Fidelis-Machines/rockfish-toolk
 | [`suricata-proto-plugins/payload_entropy/`](suricata-proto-plugins/payload_entropy/) | `payload_entropy` | Per-flow Shannon entropy and SPLT (Sequence of Packet Lengths and Times). PCR is derived downstream from `transport_signals` byte totals. |
 | [`suricata-proto-plugins/tls_pqc/`](suricata-proto-plugins/tls_pqc/) | `pqc` | Per-handshake post-quantum key-exchange classification — the ClientHello supported groups and the TLS 1.3 ServerHello chosen group, plus a NIST IR 8547 compliance verdict (`exposure_class`). |
 
-### Protocol parsers (industrial protocols)
+### Suricata protocol plugins (industrial protocols)
 
 Application-layer parsers that decode binary protocols not covered by
 Suricata's built-ins. Each emits its own EVE event type.
@@ -131,7 +133,7 @@ outputs:
 
 > Want a specific integration prioritized? [Open an issue](https://github.com/Fidelis-Machines/rockfish-toolkit/issues).
 
-## Telemetry Plugins in Detail
+## Suricata telemetry plugins in detail
 
 The two telemetry plugins are the analytics workhorses of the toolkit —
 they don't decode application protocols, they compute per-flow signals
