@@ -62,7 +62,8 @@
 #    1. Downloads the repo signing key to
 #       /usr/share/keyrings/rockfish-archive-keyring.gpg
 #    2. Writes the APT source to /etc/apt/sources.list.d/rockfish.list
-#    3. `apt-get update` then `apt-get install rockfish`
+#    3. `apt-get update`, then install rockfish — a clean `--reinstall` if an
+#       existing install is detected (package db, or ${BIN}), else a plain install.
 #    4. Installs the matching libduckdb into /usr/local/lib (the .deb does not
 #       ship it) unless one is already present.
 #    The package installs to /opt/rockfish and ships systemd units, config
@@ -179,15 +180,26 @@ install_apt() {
     info "Updating package lists"
     $SUDO apt-get update
 
-    if [ -n "$VERSION" ]; then
-        info "Installing rockfish=$VERSION"
-        $SUDO apt-get install -y "rockfish=$VERSION"
+    local pkg="rockfish"
+    [ -n "$VERSION" ] && pkg="rockfish=$VERSION"
+
+    # Existing install? Reinstall cleanly. Fresh box? Plain install.
+    if rockfish_installed; then
+        info "Existing Rockfish install detected — reinstalling ${pkg} cleanly"
+        $SUDO apt-get install -y --reinstall "$pkg"
     else
-        info "Installing rockfish (latest)"
-        $SUDO apt-get install -y rockfish
+        info "No existing install — installing ${pkg}"
+        $SUDO apt-get install -y "$pkg"
     fi
 
     success "Rockfish NDR package installed via APT."
+}
+
+# True if Rockfish is already installed — by the package database (authoritative)
+# or the binary on disk at ${BIN} (/opt/rockfish/bin/rockfish, the .deb layout).
+rockfish_installed() {
+    dpkg-query -W -f='${Status}' rockfish 2>/dev/null | grep -q "install ok installed" && return 0
+    [ -x "$BIN" ]
 }
 
 # ── libduckdb runtime dependency ─────────────────────────────────────────
