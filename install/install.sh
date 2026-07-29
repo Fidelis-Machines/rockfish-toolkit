@@ -41,8 +41,9 @@
 #                             enriches them, and stores them as Parquet.
 #    rockfish-report.service  reporting — regenerates + serves the dashboard
 #                             every ROCKFISH_REPORT_INTERVAL_MIN minutes (10).
-#  The installer asks before enabling them (skip the prompt with
-#  ROCKFISH_SERVICES=yes|no).
+#  Both are `systemctl enable`d (start on boot) and run with
+#  WorkingDirectory=/var/run/rockfish (transient data on tmpfs). The installer
+#  asks before enabling them (skip the prompt with ROCKFISH_SERVICES=yes|no).
 #
 #  ENVIRONMENT OVERRIDES
 #  ---------------------
@@ -110,7 +111,9 @@ DATA_DIR="/var/lib/rockfish"
 LICENSE_FILE="${PREFIX}/etc/rockfish_license.json"  # where to drop the license
 DATA_STORE="${PREFIX}/data"                          # default parquet hive dir
 CONFIG_FILE="${PREFIX}/etc/rockfish.yaml"
+RUNTIME_DIR="/var/run/rockfish"                      # transient runtime data (tmpfs)
 REPORT_DROPIN="/etc/systemd/system/rockfish-report.service.d/interval.conf"
+DETECT_DROPIN="/etc/systemd/system/rockfish.service.d/runtime.conf"
 
 # ── Pretty output ────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -328,8 +331,20 @@ enable_services() {
     have systemctl || { warn "systemd not present — cannot enable services."; return 0; }
     need_root
 
-    # Pin the report cadence to every REPORT_INTERVAL_MIN minutes via a drop-in,
-    # so we configure the interval without editing the packaged unit.
+    # Detection service drop-in: run from the transient runtime dir so any
+    # transient data lands in ${RUNTIME_DIR} (tmpfs). RuntimeDirectory creates it
+    # (owned by the service user) before ExecStart.
+    info "Working directory (transient data): ${RUNTIME_DIR}"
+    $SUDO install -d -m 0755 "$(dirname "$DETECT_DROPIN")"
+    $SUDO tee "$DETECT_DROPIN" >/dev/null <<EOF
+# Managed by install.sh — run from the transient runtime dir.
+[Service]
+RuntimeDirectory=rockfish
+RuntimeDirectoryPreserve=yes
+WorkingDirectory=${RUNTIME_DIR}
+EOF
+
+    # Report service drop-in: pin the cadence AND run from the same runtime dir.
     info "Report cadence: every ${REPORT_INTERVAL_MIN} min"
     $SUDO install -d -m 0755 "$(dirname "$REPORT_DROPIN")"
     $SUDO tee "$REPORT_DROPIN" >/dev/null <<EOF
@@ -337,10 +352,13 @@ enable_services() {
 [Service]
 ExecStart=
 ExecStart=${BIN} --config ${PREFIX}/etc/rockfish.yaml --env-file ${PREFIX}/etc/rockfish.env report --continuous --serve --port 8080 --interval-minutes ${REPORT_INTERVAL_MIN}
+RuntimeDirectory=rockfish
+WorkingDirectory=${RUNTIME_DIR}
 EOF
 
-    info "Enabling rockfish (detection) + rockfish-report (reporting)"
     $SUDO systemctl daemon-reload
+    # enable = start on every boot (persistent); start = start right now.
+    info "Enabling services on boot (persistent)…"
     $SUDO systemctl enable rockfish.service rockfish-report.service >/dev/null 2>&1 \
         || warn "could not enable one or both units (are they installed?)"
     # Start now, but don't abort the install if config/Suricata isn't ready yet.
@@ -349,7 +367,7 @@ EOF
     $SUDO systemctl start rockfish-report.service \
         || warn "rockfish-report.service didn't start — check config, then: systemctl start rockfish-report"
     SERVICES_ENABLED=1
-    success "Services enabled (detection + reporting every ${REPORT_INTERVAL_MIN} min)."
+    success "Services enabled on boot + started (detection + reporting every ${REPORT_INTERVAL_MIN} min)."
 }
 
 # Final actionable steps shown at the end of an APT install: drop in the license
