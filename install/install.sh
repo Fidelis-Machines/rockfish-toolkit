@@ -54,6 +54,8 @@
 #    ROCKFISH_SERVICES=yes|no        Set up the systemd services unattended
 #                                    (default: prompt).
 #    ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10).
+#    ROCKFISH_LIBDUCKDB_VERSION=X.Y.Z  Override the libduckdb version installed
+#                                    (default: inferred from bundled extensions).
 #
 #  WHAT THE INSTALL DOES (APT path)
 #  --------------------------------
@@ -61,6 +63,8 @@
 #       /usr/share/keyrings/rockfish-archive-keyring.gpg
 #    2. Writes the APT source to /etc/apt/sources.list.d/rockfish.list
 #    3. `apt-get update` then `apt-get install rockfish`
+#    4. Installs the matching libduckdb into /usr/local/lib (the .deb does not
+#       ship it) unless one is already present.
 #    The package installs to /opt/rockfish and ships systemd units, config
 #    examples, and the version-matched DuckDB extensions (inet, httpfs).
 #
@@ -83,6 +87,14 @@ VERSION="${ROCKFISH_VERSION:-}"
 # ROCKFISH_REPORT_INTERVAL_MIN minutes.
 SERVICES="${ROCKFISH_SERVICES:-}"
 REPORT_INTERVAL_MIN="${ROCKFISH_REPORT_INTERVAL_MIN:-10}"
+
+# The engine dynamically links libduckdb, which the .deb does NOT ship (it is
+# version-locked to the DuckDB the release was built against). The installer
+# fetches the matching libduckdb unless one is already present. Override the
+# version with ROCKFISH_LIBDUCKDB_VERSION; DUCKDB_FALLBACK is used only if the
+# version can't be inferred from the bundled extensions.
+LIBDUCKDB_VERSION="${ROCKFISH_LIBDUCKDB_VERSION:-}"
+DUCKDB_FALLBACK="1.4.4"
 
 # Filesystem layout the .deb installs into (used by verify).
 PREFIX="/opt/rockfish"
@@ -176,10 +188,48 @@ install_apt() {
     fi
 
     success "Rockfish NDR package installed via APT."
-    printf '\n'
-    info "Provide the runtime libduckdb (customer-supplied) if not already present,"
-    info "and set up /opt/rockfish/etc/rockfish.yaml. Update later with:"
-    echo "  sudo apt-get update && sudo apt-get upgrade rockfish"
+}
+
+# ── libduckdb runtime dependency ─────────────────────────────────────────
+# Infer the required DuckDB version from the bundled extension dir — extensions
+# are version-locked to libduckdb, so the version subdir (e.g. v1.4.4) is the
+# exact runtime version needed.
+detect_duckdb_version() {
+    local d
+    d="$(find "$EXT_DIR" -maxdepth 1 -type d -name 'v*' 2>/dev/null | sort -V | tail -1)"
+    [ -n "$d" ] && basename "$d" | sed 's/^v//'
+}
+
+# Install the matching libduckdb into /usr/local/lib unless one is already
+# present. Best-effort: on an air-gapped host the download fails and we print
+# manual instructions rather than aborting.
+install_libduckdb() {
+    have ldconfig && ldconfig -p 2>/dev/null | grep -qi 'libduckdb' && {
+        info "libduckdb already present — leaving it in place."; return 0; }
+
+    local ver="$LIBDUCKDB_VERSION"
+    [ -z "$ver" ] && ver="$(detect_duckdb_version)"
+    [ -z "$ver" ] && ver="$DUCKDB_FALLBACK"
+
+    local asset="libduckdb-linux-amd64.zip"
+    [ "$DEB_ARCH" = "arm64" ] && asset="libduckdb-linux-arm64.zip"
+    local url="https://github.com/duckdb/duckdb/releases/download/v${ver}/${asset}"
+
+    need_root
+    have unzip || $SUDO apt-get install -y unzip >/dev/null 2>&1 || true
+    have unzip || { warn "unzip not available — cannot install libduckdb ${ver}. Install it and libduckdb manually."; return 0; }
+
+    info "Installing runtime libduckdb ${ver} -> /usr/local/lib (matches the bundled extensions)"
+    local tmp; tmp="$(mktemp /tmp/rf-libduckdb.XXXXXX.zip)"
+    if curl -fsSL "$url" -o "$tmp" 2>/dev/null; then
+        $SUDO unzip -o -q "$tmp" -d /usr/local/lib/ && $SUDO ldconfig
+        rm -f "$tmp"
+        success "libduckdb ${ver} installed."
+    else
+        rm -f "$tmp"
+        warn "Could not download libduckdb ${ver} from ${url}."
+        warn "Air-gapped host? Install libduckdb ${ver} into /usr/local/lib and run ldconfig, then: install.sh verify"
+    fi
 }
 
 # ── Docker installation ──────────────────────────────────────────────────
@@ -401,6 +451,9 @@ run_install() {
         apt)
             info "Method: APT repository"
             install_apt
+            # Install the matching libduckdb so the binary actually runs (the
+            # .deb doesn't ship it).
+            install_libduckdb
             # Optionally set up the systemd services (prompts unless overridden).
             if want_services; then enable_services; fi
             ;;
@@ -438,6 +491,7 @@ Environment:
   ROCKFISH_IMAGE=...              Override the Docker image
   ROCKFISH_SERVICES=yes|no        Set up the systemd services without prompting
   ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10)
+  ROCKFISH_LIBDUCKDB_VERSION=X.Y.Z  Override the libduckdb version to install
 
 Examples:
   curl -fsSL https://docs.rockfishndr.com/install.sh | bash

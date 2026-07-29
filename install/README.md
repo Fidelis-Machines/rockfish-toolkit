@@ -65,6 +65,7 @@ Set via environment variables:
 | `ROCKFISH_IMAGE` | `rockfishnetworks/toolkit` | Override the Docker image |
 | `ROCKFISH_SERVICES` | prompt | `yes`/`no` — set up the systemd services unattended |
 | `ROCKFISH_REPORT_INTERVAL_MIN` | `10` | Report regeneration cadence, in minutes |
+| `ROCKFISH_LIBDUCKDB_VERSION` | inferred | Override the libduckdb version installed |
 
 ## systemd services
 
@@ -91,6 +92,11 @@ ROCKFISH_METHOD=docker      curl -fsSL https://docs.rockfishndr.com/install.sh |
 1. Downloads the repo signing key → `/usr/share/keyrings/rockfish-archive-keyring.gpg`
 2. Writes the APT source → `/etc/apt/sources.list.d/rockfish.list`
 3. `apt-get update` → `apt-get install rockfish`
+4. Installs the matching **`libduckdb`** into `/usr/local/lib` (the `.deb`
+   doesn't ship it, and the engine links it dynamically) — unless one is already
+   present. The version is inferred from the bundled DuckDB extensions, so it
+   always matches. On an air-gapped host the download is skipped with
+   instructions to install `libduckdb` manually.
 
 The package installs to `/opt/rockfish` and ships the systemd units, config
 examples, and the version-matched DuckDB extensions. Full reference:
