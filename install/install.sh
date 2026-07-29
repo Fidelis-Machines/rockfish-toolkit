@@ -401,17 +401,31 @@ RuntimeDirectoryPreserve=yes
 WorkingDirectory=${RUNTIME_DIR}
 EOF
 
-    # Report service drop-in: pin the cadence AND run from the same runtime dir.
-    info "Report cadence: every ${REPORT_INTERVAL_MIN} min"
+    # Report service drop-in: run from the runtime dir; only override ExecStart
+    # when the cadence differs from the engine default. `rockfish report`
+    # defaults to --continuous --serve --port 8080 --interval-minutes 10, so the
+    # default case needs no ExecStart at all.
     $SUDO install -d -m 0755 "$(dirname "$REPORT_DROPIN")"
-    $SUDO tee "$REPORT_DROPIN" >/dev/null <<EOF
-# Managed by install.sh — regenerate the report every ${REPORT_INTERVAL_MIN} minutes.
+    if [ "$REPORT_INTERVAL_MIN" = "10" ]; then
+        info "Report cadence: every 10 min (engine default)"
+        $SUDO tee "$REPORT_DROPIN" >/dev/null <<EOF
+# Managed by install.sh — run from the transient runtime dir.
+# (rockfish report defaults to --continuous --serve --port 8080 --interval-minutes 10.)
 [Service]
-ExecStart=
-ExecStart=${BIN} --config ${PREFIX}/etc/rockfish.yaml --env-file ${PREFIX}/etc/rockfish.env report --continuous --serve --port 8080 --interval-minutes ${REPORT_INTERVAL_MIN}
 RuntimeDirectory=rockfish
 WorkingDirectory=${RUNTIME_DIR}
 EOF
+    else
+        info "Report cadence: every ${REPORT_INTERVAL_MIN} min"
+        $SUDO tee "$REPORT_DROPIN" >/dev/null <<EOF
+# Managed by install.sh — custom report interval + transient runtime dir.
+[Service]
+ExecStart=
+ExecStart=${BIN} --config ${PREFIX}/etc/rockfish.yaml --env-file ${PREFIX}/etc/rockfish.env report --interval-minutes ${REPORT_INTERVAL_MIN}
+RuntimeDirectory=rockfish
+WorkingDirectory=${RUNTIME_DIR}
+EOF
+    fi
 
     $SUDO systemctl daemon-reload
     # enable = start on every boot (persistent); start = start right now.
