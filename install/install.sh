@@ -116,6 +116,7 @@ LICENSE_FILE="${PREFIX}/etc/rockfish_license.json"  # where to drop the license
 DATA_STORE="${PREFIX}/data"                          # default parquet hive dir
 CONFIG_FILE="${PREFIX}/etc/rockfish.yaml"
 RUNTIME_DIR="/var/run/rockfish"                      # transient runtime data (tmpfs)
+EVE_SOCKET="/var/run/rockfish/eve.socket"            # default EVE input socket
 REPORT_DROPIN="/etc/systemd/system/rockfish-report.service.d/interval.conf"
 DETECT_DROPIN="/etc/systemd/system/rockfish.service.d/runtime.conf"
 
@@ -327,6 +328,17 @@ configure_defaults() {
         printf '\n# Path to the signed Rockfish license file (override with --license).\nlicense: %s\n' "$LICENSE_FILE" \
             | $SUDO tee -a "$CONFIG_FILE" >/dev/null
         info "Set license -> ${LICENSE_FILE} in ${CONFIG_FILE}"
+    fi
+
+    # Default EVE input to the Unix socket when the config has no input: block
+    # (Rockfish creates the socket; Suricata connects to it). Leaves an existing
+    # input configuration alone.
+    if grep -qE '^[[:space:]]*input:' "$CONFIG_FILE"; then
+        info "Leaving existing 'input:' in ${CONFIG_FILE} unchanged."
+    else
+        printf '\n# EVE input: Rockfish creates this socket; Suricata connects to it.\ninput:\n  socket: %s\n  socket_type: stream\n  reconnect: true\n' "$EVE_SOCKET" \
+            | $SUDO tee -a "$CONFIG_FILE" >/dev/null
+        info "Set input.socket -> ${EVE_SOCKET} in ${CONFIG_FILE}"
     fi
 }
 
