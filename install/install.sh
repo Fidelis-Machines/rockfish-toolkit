@@ -66,6 +66,10 @@
 #       existing install is detected (package db, or ${BIN}), else a plain install.
 #    4. Installs the matching libduckdb into /usr/local/lib (the .deb does not
 #       ship it) unless one is already present.
+#    5. Creates the parquet storage dir /opt/rockfish/data and points the
+#       config's output.dir at it (unless already customized).
+#    6. Optionally enables the services, then runs verify and reminds you to
+#       drop in the license and restart.
 #    The package installs to /opt/rockfish and ships systemd units, config
 #    examples, and the version-matched DuckDB extensions (inet, httpfs).
 #
@@ -88,6 +92,7 @@ VERSION="${ROCKFISH_VERSION:-}"
 # ROCKFISH_REPORT_INTERVAL_MIN minutes.
 SERVICES="${ROCKFISH_SERVICES:-}"
 REPORT_INTERVAL_MIN="${ROCKFISH_REPORT_INTERVAL_MIN:-10}"
+SERVICES_ENABLED=0   # set to 1 once enable_services runs
 
 # The engine dynamically links libduckdb, which the .deb does NOT ship (it is
 # version-locked to the DuckDB the release was built against). The installer
@@ -102,6 +107,9 @@ PREFIX="/opt/rockfish"
 BIN="${PREFIX}/bin/rockfish"
 EXT_DIR="${PREFIX}/shared/extensions"          # {ver}/{platform}/{name}.duckdb_extension
 DATA_DIR="/var/lib/rockfish"
+LICENSE_FILE="${PREFIX}/etc/rockfish_license.json"  # where to drop the license
+DATA_STORE="${PREFIX}/data"                          # default parquet hive dir
+CONFIG_FILE="${PREFIX}/etc/rockfish.yaml"
 REPORT_DROPIN="/etc/systemd/system/rockfish-report.service.d/interval.conf"
 
 # ── Pretty output ────────────────────────────────────────────────────────
@@ -244,6 +252,24 @@ install_libduckdb() {
     fi
 }
 
+# ── Parquet storage directory ────────────────────────────────────────────
+# Default installs store Parquet under /opt/rockfish/data. Create it (owned by
+# the service user) and point the config's output.dir at it — but only when the
+# config still holds the packaged default, so a customized dir is never clobbered.
+setup_storage_dir() {
+    need_root
+    info "Parquet storage directory: ${DATA_STORE}"
+    $SUDO install -d -m 0755 "$DATA_STORE"
+    id rockfish >/dev/null 2>&1 && $SUDO chown -R rockfish:rockfish "$DATA_STORE" || true
+
+    if [ -f "$CONFIG_FILE" ] && grep -qE '^[[:space:]]*dir:[[:space:]]*/var/lib/rockfish/parquet[[:space:]]*$' "$CONFIG_FILE"; then
+        $SUDO sed -i -E "s#^([[:space:]]*)dir:[[:space:]]*/var/lib/rockfish/parquet[[:space:]]*\$#\1dir: ${DATA_STORE}#" "$CONFIG_FILE"
+        info "Set output.dir -> ${DATA_STORE} in ${CONFIG_FILE}"
+    elif [ -f "$CONFIG_FILE" ]; then
+        info "Leaving existing output.dir in ${CONFIG_FILE} unchanged (not the packaged default)."
+    fi
+}
+
 # ── Docker installation ──────────────────────────────────────────────────
 install_docker() {
     have docker || error "Docker is required for this method but was not found. Install Docker and re-run."
@@ -322,7 +348,24 @@ EOF
         || warn "rockfish.service didn't start — set up /opt/rockfish/etc/rockfish.yaml and Suricata, then: systemctl start rockfish"
     $SUDO systemctl start rockfish-report.service \
         || warn "rockfish-report.service didn't start — check config, then: systemctl start rockfish-report"
+    SERVICES_ENABLED=1
     success "Services enabled (detection + reporting every ${REPORT_INTERVAL_MIN} min)."
+}
+
+# Final actionable steps shown at the end of an APT install: drop in the license
+# and (re)start the services so it takes effect.
+post_install_reminder() {
+    printf '\n'
+    info "Final steps:"
+    echo "  1. Place your license file at: ${LICENSE_FILE}"
+    echo "     (or point '${PREFIX}/etc/rockfish.yaml' at it via 'license:', or pass --license <path>)"
+    if [ "$SERVICES_ENABLED" = "1" ]; then
+        echo "  2. Restart the services to load the license:"
+        echo "       sudo systemctl restart rockfish rockfish-report"
+    else
+        echo "  2. Start the services once configured:"
+        echo "       sudo systemctl enable --now rockfish rockfish-report"
+    fi
 }
 
 # ── Verify mode ──────────────────────────────────────────────────────────
@@ -410,6 +453,7 @@ verify_apt_install() {
 
     # 7. Data directory
     [ -d "$DATA_DIR" ] && pass "data dir present: $DATA_DIR" || vwarn "data dir absent: $DATA_DIR (created on first run)"
+    [ -d "$DATA_STORE" ] && pass "parquet storage dir present: $DATA_STORE" || vwarn "parquet storage dir absent: $DATA_STORE"
 
     # 8. APT wiring (so future upgrades work)
     [ -f "$KEYRING_PATH" ] && pass "APT signing key installed" || vwarn "APT signing key missing: $KEYRING_PATH"
@@ -466,6 +510,8 @@ run_install() {
             # Install the matching libduckdb so the binary actually runs (the
             # .deb doesn't ship it).
             install_libduckdb
+            # Default parquet storage under /opt/rockfish/data.
+            setup_storage_dir
             # Optionally set up the systemd services (prompts unless overridden).
             if want_services; then enable_services; fi
             ;;
@@ -475,14 +521,20 @@ run_install() {
             error "Unknown ROCKFISH_METHOD='$METHOD' (expected 'apt' or 'docker')." ;;
     esac
 
-    # Always finish by verifying the result.
+    # Verify the result.
     printf '\n'
     info "Running post-install verification…"
     printf '\n'
-    if run_verify; then
-        printf '\n'; success "Done. Docs: https://docs.rockfishndr.com/getting-started/installation.html"
+    local vres=0
+    run_verify || vres=1
+
+    # Remind about the license + restart (APT installs).
+    [ "$METHOD" = "apt" ] && post_install_reminder
+
+    printf '\n'
+    if [ "$vres" -eq 0 ]; then
+        success "Done. Docs: https://docs.rockfishndr.com/getting-started/installation.html"
     else
-        printf '\n'
         warn "Install completed, but verification reported issues above (e.g. libduckdb not yet present). Resolve them and re-run: install.sh verify"
         exit 1
     fi

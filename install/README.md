@@ -97,6 +97,11 @@ ROCKFISH_METHOD=docker      curl -fsSL https://docs.rockfishndr.com/install.sh |
    present. The version is inferred from the bundled DuckDB extensions, so it
    always matches. On an air-gapped host the download is skipped with
    instructions to install `libduckdb` manually.
+5. Creates the parquet storage directory **`/opt/rockfish/data`** and points the
+   config's `output.dir` at it (leaves a customized `output.dir` alone).
+
+At the end it reminds you to place the license file at
+`/opt/rockfish/etc/rockfish_license.json` and restart the services.
 
 The package installs to `/opt/rockfish` and ships the systemd units, config
 examples, and the version-matched DuckDB extensions. Full reference:
