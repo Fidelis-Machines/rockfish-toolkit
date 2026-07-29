@@ -122,9 +122,9 @@ DETECT_DROPIN="/etc/systemd/system/rockfish.service.d/runtime.conf"
 
 # ── Pretty output ────────────────────────────────────────────────────────
 if [ -t 1 ]; then
-    BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+    BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; BOLD='\033[1m'; NC='\033[0m'
 else
-    BLUE=''; GREEN=''; YELLOW=''; RED=''; NC=''
+    BLUE=''; GREEN=''; YELLOW=''; RED=''; BOLD=''; NC=''
 fi
 info()    { printf "${BLUE}==>${NC} %s\n" "$1"; }
 success() { printf "${GREEN}==>${NC} %s\n" "$1"; }
@@ -456,17 +456,27 @@ EOF
 # Final actionable steps shown at the end of an APT install: drop in the license
 # and (re)start the services so it takes effect.
 post_install_reminder() {
-    printf '\n'
-    info "Final steps:"
-    echo "  1. Place your license file at: ${LICENSE_FILE}"
-    echo "     (or point '${PREFIX}/etc/rockfish.yaml' at it via 'license:', or pass --license <path>)"
+    # Bright, ruled, "action required" block so the license/restart steps stand
+    # out from the install log rather than scrolling past unnoticed.
+    local rule="────────────────────────────────────────────────────────────"
+    local svc_step
     if [ "$SERVICES_ENABLED" = "1" ]; then
-        echo "  2. Restart the services to load the license:"
-        echo "       sudo systemctl restart rockfish rockfish-report"
+        svc_step="  2. Restart the services to load the license:
+       ${BOLD}${GREEN}sudo systemctl restart rockfish rockfish-report${NC}"
     else
-        echo "  2. Start the services once configured:"
-        echo "       sudo systemctl enable --now rockfish rockfish-report"
+        svc_step="  2. Start the services once configured:
+       ${BOLD}${GREEN}sudo systemctl enable --now rockfish rockfish-report${NC}"
     fi
+
+    printf '\n'
+    printf "${YELLOW}${rule}${NC}\n"
+    printf "${YELLOW}${BOLD}  ⚑ ACTION REQUIRED — finish your install${NC}\n"
+    printf "${YELLOW}${rule}${NC}\n"
+    printf "  1. Place your license file at:\n"
+    printf "       ${BOLD}${GREEN}%s${NC}\n" "${LICENSE_FILE}"
+    printf "     (or set ${BOLD}license:${NC} in %s, or pass --license <path>)\n" "${PREFIX}/etc/rockfish.yaml"
+    printf "%b\n" "$svc_step"
+    printf "${YELLOW}${rule}${NC}\n"
 }
 
 # ── Verify mode ──────────────────────────────────────────────────────────
