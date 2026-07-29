@@ -20,7 +20,7 @@
 | **Decode** | [OT / IIoT protocol **Suricata plugins**](#suricata-protocol-plugins-industrial-protocols) |
 | **Telemetry** | [`UDP/TCP metrics` **Suricata plugin**](#transport_signals--network-signal-metrics) |
 | **ETA** | [Encrypted Traffic Analysis (ETA) **Suricata plugin**](#payload_entropy--encrypted-traffic-analysis) |
-| **PQC** | [Post-quantum cryptography (PQC) **Suricata plugin**](#tls_pqc--post-quantum-cryptography-pqc-compliance) ([NIST IR 8547](https://csrc.nist.gov/pubs/ir/8547/final)) |
+| **PQC** | [Post-quantum cryptography (PQC) **Suricata plugin**](#tls_pqc--post-quantum-cryptography-pqc-compliance) ([NIST IR 8547](https://nvlpubs.nist.gov/nistpubs/ir/2024/NIST.IR.8547.ipd.pdf)) |
 | **Respond** *(coming soon)* | [Response pipeline integrations](integrations/) &middot; [MQTT](integrations/mqtt/) &middot; [Kafka](integrations/kafka/) &middot; [Webhook](integrations/webhook/) |
 
 **Reference:** [Build scripts](#build-scripts) &middot; [Requirements](#requirements) &middot; [Building](#building) &middot; [Repository layout](#repository-layout)
@@ -324,7 +324,7 @@ page under "NIST PQC Compliance". See
 [`suricata-proto-plugins/tls_pqc/README.md`](suricata-proto-plugins/tls_pqc/README.md)
 for the full field reference.
 
-[NIST IR 8547]: https://csrc.nist.gov/pubs/ir/8547/final
+[NIST IR 8547]: https://nvlpubs.nist.gov/nistpubs/ir/2024/NIST.IR.8547.ipd.pdf
 
 ## Requirements
 
