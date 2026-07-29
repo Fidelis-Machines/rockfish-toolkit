@@ -92,16 +92,22 @@ ROCKFISH_METHOD=docker      curl -fsSL https://docs.rockfishndr.com/install.sh |
 1. Downloads the repo signing key → `/usr/share/keyrings/rockfish-archive-keyring.gpg`
 2. Writes the APT source → `/etc/apt/sources.list.d/rockfish.list`
 3. `apt-get update` → `apt-get install rockfish`
-4. Installs the matching **`libduckdb`** into `/usr/local/lib` (the `.deb`
-   doesn't ship it, and the engine links it dynamically) — unless one is already
-   present. The version is inferred from the bundled DuckDB extensions, so it
-   always matches. On an air-gapped host the download is skipped with
-   instructions to install `libduckdb` manually.
+4. Installs the **`libduckdb`** whose **version matches the bundled extensions**
+   into `/usr/local/lib` (the `.deb` doesn't ship it, and the engine links it
+   dynamically). Because the extensions are **version-locked**, a pre-existing
+   but differently-versioned `libduckdb` (e.g. a distro/pip/dev build that
+   reports a git hash instead of `v1.4.4`) is **replaced** — otherwise
+   `LOAD inet` fails at report time. Skip entirely with
+   `ROCKFISH_SKIP_LIBDUCKDB=1`; on an air-gapped host the download is skipped
+   with manual instructions.
 5. Creates the parquet storage directory **`/opt/rockfish/data`** and points the
-   config's `output.dir` at it (leaves a customized `output.dir` alone).
+   config's `output.dir` at it; defaults the config's `license:` path to
+   **`/opt/rockfish/etc/rockfish_license.json`** (both left alone if already
+   customized).
 
-At the end it reminds you to place the license file at
-`/opt/rockfish/etc/rockfish_license.json` and restart the services.
+`verify` also checks that the resolved `libduckdb` **version matches** the
+bundled extensions, so a mismatch is caught instead of showing all-green. At the
+end the installer reminds you to place the license file and restart the services.
 
 The package installs to `/opt/rockfish` and ships the systemd units, config
 examples, and the version-matched DuckDB extensions. Full reference:

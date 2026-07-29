@@ -57,6 +57,7 @@
 #    ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10).
 #    ROCKFISH_LIBDUCKDB_VERSION=X.Y.Z  Override the libduckdb version installed
 #                                    (default: inferred from bundled extensions).
+#    ROCKFISH_SKIP_LIBDUCKDB=1       Don't touch libduckdb (manage it yourself).
 #
 #  WHAT THE INSTALL DOES (APT path)
 #  --------------------------------
@@ -65,10 +66,13 @@
 #    2. Writes the APT source to /etc/apt/sources.list.d/rockfish.list
 #    3. `apt-get update`, then install rockfish — a clean `--reinstall` if an
 #       existing install is detected (package db, or ${BIN}), else a plain install.
-#    4. Installs the matching libduckdb into /usr/local/lib (the .deb does not
-#       ship it) unless one is already present.
+#    4. Installs the libduckdb whose VERSION matches the bundled extensions into
+#       /usr/local/lib (the .deb doesn't ship it). A pre-existing but
+#       differently-versioned libduckdb is replaced, since the extensions are
+#       version-locked (skip entirely with ROCKFISH_SKIP_LIBDUCKDB=1).
 #    5. Creates the parquet storage dir /opt/rockfish/data and points the
-#       config's output.dir at it (unless already customized).
+#       config's output.dir at it; defaults the config's license path to
+#       /opt/rockfish/etc/rockfish_license.json (both left alone if customized).
 #    6. Optionally enables the services, then runs verify and reminds you to
 #       drop in the license and restart.
 #    The package installs to /opt/rockfish and ships systemd units, config
@@ -226,13 +230,46 @@ detect_duckdb_version() {
 # Install the matching libduckdb into /usr/local/lib unless one is already
 # present. Best-effort: on an air-gapped host the download fails and we print
 # manual instructions rather than aborting.
+# Path of the libduckdb the ENGINE actually links (authoritative), falling back
+# to the ldconfig cache when the binary isn't installed yet.
+resolved_libduckdb() {
+    if [ -x "$BIN" ] && have ldd; then
+        # Skip "libduckdb.so => not found" lines; take the resolved path only.
+        local p; p="$(ldd "$BIN" 2>/dev/null | awk '/libduckdb/ && $0 !~ /not found/ {print $3; exit}')"
+        [ -n "$p" ] && { printf '%s\n' "$p"; return 0; }
+    fi
+    have ldconfig && ldconfig -p 2>/dev/null | awk '/libduckdb\.so/{print $NF; exit}'
+}
+
+# True if the .so at $1 carries the clean release tag v$2 (e.g. v1.4.4). A build
+# without a release tag reports a bare git hash (e.g. 7316202df1) instead, and
+# DuckDB's version-locked extensions refuse to load into it — which is exactly
+# the failure we're guarding against. Uses grep -a so no binutils are needed.
+libduckdb_is_version() {
+    grep -aoE "v[0-9]+\.[0-9]+\.[0-9]+" "$1" 2>/dev/null | grep -qx "v$2"
+}
+
+# Install the libduckdb that MATCHES the bundled extensions. The extensions are
+# version-locked, so a pre-existing but differently-versioned libduckdb (a
+# distro/pip/dev build reporting a git hash) makes `LOAD inet` fail. We therefore
+# check the VERSION, not mere presence, and install the matching release unless
+# the resolved libduckdb already carries the right tag.
 install_libduckdb() {
-    have ldconfig && ldconfig -p 2>/dev/null | grep -qi 'libduckdb' && {
-        info "libduckdb already present — leaving it in place."; return 0; }
+    [ "${ROCKFISH_SKIP_LIBDUCKDB:-}" = "1" ] && { info "ROCKFISH_SKIP_LIBDUCKDB=1 — skipping libduckdb."; return 0; }
 
     local ver="$LIBDUCKDB_VERSION"
     [ -z "$ver" ] && ver="$(detect_duckdb_version)"
     [ -z "$ver" ] && ver="$DUCKDB_FALLBACK"
+
+    local target="/usr/local/lib/libduckdb.so"
+    local cur; cur="$(resolved_libduckdb)"
+    if [ -n "$cur" ] && libduckdb_is_version "$cur" "$ver"; then
+        info "libduckdb v${ver} already present (${cur}) — matches bundled extensions."
+        return 0
+    fi
+    if [ -n "$cur" ]; then
+        warn "Resolved libduckdb (${cur}) is NOT v${ver}; bundled extensions are version-locked to v${ver}. Installing the matching libduckdb."
+    fi
 
     local asset="libduckdb-linux-amd64.zip"
     [ "$DEB_ARCH" = "arm64" ] && asset="libduckdb-linux-arm64.zip"
@@ -240,18 +277,25 @@ install_libduckdb() {
 
     need_root
     have unzip || $SUDO apt-get install -y unzip >/dev/null 2>&1 || true
-    have unzip || { warn "unzip not available — cannot install libduckdb ${ver}. Install it and libduckdb manually."; return 0; }
+    have unzip || { warn "unzip not available — cannot install libduckdb ${ver}. Install unzip and libduckdb manually."; return 0; }
 
-    info "Installing runtime libduckdb ${ver} -> /usr/local/lib (matches the bundled extensions)"
+    info "Installing runtime libduckdb v${ver} -> /usr/local/lib (matches the bundled extensions)"
     local tmp; tmp="$(mktemp /tmp/rf-libduckdb.XXXXXX.zip)"
     if curl -fsSL "$url" -o "$tmp" 2>/dev/null; then
         $SUDO unzip -o -q "$tmp" -d /usr/local/lib/ && $SUDO ldconfig
         rm -f "$tmp"
-        success "libduckdb ${ver} installed."
+        success "libduckdb v${ver} installed."
     else
         rm -f "$tmp"
         warn "Could not download libduckdb ${ver} from ${url}."
         warn "Air-gapped host? Install libduckdb ${ver} into /usr/local/lib and run ldconfig, then: install.sh verify"
+        return 0
+    fi
+
+    # If a DIFFERENT libduckdb still resolves first, our copy is shadowed.
+    local now; now="$(resolved_libduckdb)"
+    if [ -n "$now" ] && [ "$now" != "$target" ] && ! libduckdb_is_version "$now" "$ver"; then
+        warn "Another libduckdb still resolves first: ${now}. Remove it (or fix ld order) so ${target} (v${ver}) is used — otherwise 'LOAD inet' will fail."
     fi
 }
 
@@ -259,17 +303,30 @@ install_libduckdb() {
 # Default installs store Parquet under /opt/rockfish/data. Create it (owned by
 # the service user) and point the config's output.dir at it — but only when the
 # config still holds the packaged default, so a customized dir is never clobbered.
-setup_storage_dir() {
+configure_defaults() {
     need_root
+
+    # Parquet storage under ${DATA_STORE}.
     info "Parquet storage directory: ${DATA_STORE}"
     $SUDO install -d -m 0755 "$DATA_STORE"
     id rockfish >/dev/null 2>&1 && $SUDO chown -R rockfish:rockfish "$DATA_STORE" || true
 
-    if [ -f "$CONFIG_FILE" ] && grep -qE '^[[:space:]]*dir:[[:space:]]*/var/lib/rockfish/parquet[[:space:]]*$' "$CONFIG_FILE"; then
+    [ -f "$CONFIG_FILE" ] || return 0
+
+    if grep -qE '^[[:space:]]*dir:[[:space:]]*/var/lib/rockfish/parquet[[:space:]]*$' "$CONFIG_FILE"; then
         $SUDO sed -i -E "s#^([[:space:]]*)dir:[[:space:]]*/var/lib/rockfish/parquet[[:space:]]*\$#\1dir: ${DATA_STORE}#" "$CONFIG_FILE"
         info "Set output.dir -> ${DATA_STORE} in ${CONFIG_FILE}"
-    elif [ -f "$CONFIG_FILE" ]; then
+    else
         info "Leaving existing output.dir in ${CONFIG_FILE} unchanged (not the packaged default)."
+    fi
+
+    # License path is a config item; default it to ${LICENSE_FILE} when unset.
+    if grep -qE '^[[:space:]]*license:' "$CONFIG_FILE"; then
+        info "Leaving existing 'license:' in ${CONFIG_FILE} unchanged."
+    else
+        printf '\n# Path to the signed Rockfish license file (override with --license).\nlicense: %s\n' "$LICENSE_FILE" \
+            | $SUDO tee -a "$CONFIG_FILE" >/dev/null
+        info "Set license -> ${LICENSE_FILE} in ${CONFIG_FILE}"
     fi
 }
 
@@ -424,6 +481,20 @@ verify_apt_install() {
         fi
     fi
 
+    # 3b. libduckdb VERSION must match the bundled extensions (version-locked).
+    # This is the check that catches a wrong/untagged libduckdb (e.g. one that
+    # reports a git hash) which makes `LOAD inet` fail even though the binary runs.
+    local want_ver so_path
+    want_ver="$(detect_duckdb_version)"
+    so_path="$(resolved_libduckdb)"
+    if [ -n "$want_ver" ] && [ -n "$so_path" ]; then
+        if libduckdb_is_version "$so_path" "$want_ver"; then
+            pass "libduckdb version matches bundled extensions (v${want_ver})"
+        else
+            fail "libduckdb (${so_path}) is NOT v${want_ver} — the bundled inet/httpfs extensions are version-locked and 'LOAD inet' will fail. Re-run the installer to replace it, or install libduckdb v${want_ver}."
+        fi
+    fi
+
     # 4. Bundled DuckDB extensions (inet, httpfs) present for the installed ver
     if [ -d "$EXT_DIR" ]; then
         local found_inet found_httpfs
@@ -528,8 +599,8 @@ run_install() {
             # Install the matching libduckdb so the binary actually runs (the
             # .deb doesn't ship it).
             install_libduckdb
-            # Default parquet storage under /opt/rockfish/data.
-            setup_storage_dir
+            # Default config: parquet storage under /opt/rockfish/data + license path.
+            configure_defaults
             # Optionally set up the systemd services (prompts unless overridden).
             if want_services; then enable_services; fi
             ;;
