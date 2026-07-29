@@ -15,7 +15,7 @@
 
 | Stage | Functions |
 |---|---|
-| **Deploy** ⭐ | [Run RockfishNDR in Docker](#run-rockfish-in-docker) |
+| **Deploy** ⭐ | [Quick install](#quick-install) &middot; [Run RockfishNDR in Docker](#run-rockfish-in-docker) |
 | **Capture** | [FMADIO ring **Suricata capture plugin**](#suricata-capture-plugin) |
 | **Decode** | [OT / IIoT protocol **Suricata plugins**](#suricata-protocol-plugins-industrial-protocols) |
 | **Telemetry** | [`UDP/TCP metrics` **Suricata plugin**](#transport_signals--network-signal-metrics) |
@@ -41,6 +41,32 @@ It grows with each phase of Fidelis Machines' research in ROS / OT / IoT securit
 
 > **Learn more about Rockfish NDR** — the air-gap-native Network Detection &amp; Response solution this toolkit integrates with: <https://rockfishndr.com>
 
+
+## Quick install
+
+Install the Rockfish NDR engine (the detection engine this toolkit feeds) with
+one command. The installer auto-detects your platform — APT on Debian/Ubuntu,
+Docker elsewhere:
+
+```bash
+curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+```
+
+Options:
+
+```bash
+# Pin a specific version
+ROCKFISH_VERSION=2026.07.6 curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+
+# Force a method (apt or docker)
+ROCKFISH_METHOD=apt    curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+ROCKFISH_METHOD=docker curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+```
+
+The same script lives in this repo at [`install.sh`](install.sh) — read it
+before piping to a shell, or run it after cloning. It installs only the
+**engine**; build and load the **Suricata plugins** below to feed it. See the
+[installation docs](https://docs.rockfishndr.com/getting-started/installation.html).
 
 ## Get the code
 
@@ -454,6 +480,7 @@ schemas, and example queries.
 
 ```
 rockfish-toolkit/
+├── install.sh                     # Deploy: one-line engine installer (APT / Docker)
 ├── docker/                        # Deploy: Dockerfile + README to run the rockfish CLI
 ├── integrations/                  # Respond: response-pipeline recipes (coming soon)
 │   ├── mqtt/                       #   MQTT → OT/SCADA broker
