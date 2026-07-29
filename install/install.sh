@@ -28,18 +28,32 @@
 #  MODES
 #  -----
 #    install  (default)  Add the APT repo (Debian/Ubuntu amd64) and install the
-#                        `rockfish` package, or pull the Docker image elsewhere.
+#                        `rockfish` package (or pull the Docker image elsewhere).
+#                        On APT hosts it then PROMPTS to set up the two systemd
+#                        services, and finishes by running `verify`.
 #    verify              Run read-only diagnostics and report whether the
 #                        installation is correct and complete. Exits non-zero if
 #                        any check FAILs. Changes nothing on disk.
 #
+#  SYSTEMD SERVICES (APT installs)
+#  -------------------------------
+#    rockfish.service         detection — collects Suricata EVE records,
+#                             enriches them, and stores them as Parquet.
+#    rockfish-report.service  reporting — regenerates + serves the dashboard
+#                             every ROCKFISH_REPORT_INTERVAL_MIN minutes (10).
+#  The installer asks before enabling them (skip the prompt with
+#  ROCKFISH_SERVICES=yes|no).
+#
 #  ENVIRONMENT OVERRIDES
 #  ---------------------
-#    ROCKFISH_METHOD=apt|docker   Force an install method (default: auto-detect —
-#                                 APT on Debian/Ubuntu amd64, Docker otherwise).
-#    ROCKFISH_VERSION=2026.07.6   Pin a specific version (default: latest).
-#    ROCKFISH_IMAGE=...           Override the Docker image
-#                                 (default: rockfishnetworks/toolkit).
+#    ROCKFISH_METHOD=apt|docker      Force an install method (default: auto —
+#                                    APT on Debian/Ubuntu amd64, else Docker).
+#    ROCKFISH_VERSION=2026.07.6      Pin a specific version (default: latest).
+#    ROCKFISH_IMAGE=...              Override the Docker image
+#                                    (default: rockfishnetworks/toolkit).
+#    ROCKFISH_SERVICES=yes|no        Set up the systemd services unattended
+#                                    (default: prompt).
+#    ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10).
 #
 #  WHAT THE INSTALL DOES (APT path)
 #  --------------------------------
@@ -64,11 +78,18 @@ DOCKER_IMAGE="${ROCKFISH_IMAGE:-rockfishnetworks/toolkit}"
 METHOD="${ROCKFISH_METHOD:-}"
 VERSION="${ROCKFISH_VERSION:-}"
 
+# systemd services. ROCKFISH_SERVICES forces the choice non-interactively
+# (yes/no); left unset, the installer prompts. The report regenerates every
+# ROCKFISH_REPORT_INTERVAL_MIN minutes.
+SERVICES="${ROCKFISH_SERVICES:-}"
+REPORT_INTERVAL_MIN="${ROCKFISH_REPORT_INTERVAL_MIN:-10}"
+
 # Filesystem layout the .deb installs into (used by verify).
 PREFIX="/opt/rockfish"
 BIN="${PREFIX}/bin/rockfish"
 EXT_DIR="${PREFIX}/shared/extensions"          # {ver}/{platform}/{name}.duckdb_extension
 DATA_DIR="/var/lib/rockfish"
+REPORT_DROPIN="/etc/systemd/system/rockfish-report.service.d/interval.conf"
 
 # ── Pretty output ────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -154,15 +175,11 @@ install_apt() {
         $SUDO apt-get install -y rockfish
     fi
 
-    success "Rockfish NDR installed via APT."
+    success "Rockfish NDR package installed via APT."
     printf '\n'
-    info "Next steps:"
-    echo "  sudo systemctl daemon-reload"
-    echo "  sudo systemctl enable --now rockfish rockfish-report"
-    echo "  rockfish --version"
-    echo
-    echo "  Verify:  curl -fsSL https://docs.rockfishndr.com/install.sh | bash -s -- verify"
-    echo "  Update:  sudo apt-get update && sudo apt-get upgrade rockfish"
+    info "Provide the runtime libduckdb (customer-supplied) if not already present,"
+    info "and set up /opt/rockfish/etc/rockfish.yaml. Update later with:"
+    echo "  sudo apt-get update && sudo apt-get upgrade rockfish"
 }
 
 # ── Docker installation ──────────────────────────────────────────────────
@@ -185,6 +202,65 @@ install_docker() {
 
   Verify: docker run --rm $ref rockfish --version
 EOF
+}
+
+# ── systemd services ─────────────────────────────────────────────────────
+# The package ships two units:
+#   rockfish.service         detection engine (`rockfish detect`) — collects
+#                            Suricata EVE records, enriches them, and stores
+#                            them as Parquet.
+#   rockfish-report.service  reporting — regenerates and serves the dashboard,
+#                            every REPORT_INTERVAL_MIN minutes.
+
+# Ask whether to set up the services. Works under `curl | bash` by reading the
+# terminal (/dev/tty), since stdin is the piped script. ROCKFISH_SERVICES
+# (yes/no) skips the prompt; with no terminal and no override, default to no.
+want_services() {
+    case "$SERVICES" in
+        1|y|Y|yes|YES|true)  return 0 ;;
+        0|n|N|no|NO|false)   info "Skipping service setup (ROCKFISH_SERVICES=$SERVICES)."; return 1 ;;
+    esac
+    have systemctl || { info "systemd not present — skipping service setup."; return 1; }
+    # Prompt on the terminal (stdin is the piped script under `curl | bash`).
+    # Only a SUCCESSFUL read counts as an answer — an empty line (Enter) means
+    # yes, but EOF/no-tty falls through to skip so we never auto-enable
+    # non-interactively.
+    if [ -r /dev/tty ]; then
+        local ans
+        printf "Install and enable the detection + reporting systemd services now? [Y/n] " > /dev/tty
+        if read -r ans < /dev/tty; then
+            case "$ans" in [Nn]*) return 1 ;; *) return 0 ;; esac
+        fi
+    fi
+    info "No interactive input — skipping services (set ROCKFISH_SERVICES=yes to enable unattended)."
+    return 1
+}
+
+enable_services() {
+    have systemctl || { warn "systemd not present — cannot enable services."; return 0; }
+    need_root
+
+    # Pin the report cadence to every REPORT_INTERVAL_MIN minutes via a drop-in,
+    # so we configure the interval without editing the packaged unit.
+    info "Report cadence: every ${REPORT_INTERVAL_MIN} min"
+    $SUDO install -d -m 0755 "$(dirname "$REPORT_DROPIN")"
+    $SUDO tee "$REPORT_DROPIN" >/dev/null <<EOF
+# Managed by install.sh — regenerate the report every ${REPORT_INTERVAL_MIN} minutes.
+[Service]
+ExecStart=
+ExecStart=${BIN} --config ${PREFIX}/etc/rockfish.yaml --env-file ${PREFIX}/etc/rockfish.env report --continuous --serve --port 8080 --interval-minutes ${REPORT_INTERVAL_MIN}
+EOF
+
+    info "Enabling rockfish (detection) + rockfish-report (reporting)"
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl enable rockfish.service rockfish-report.service >/dev/null 2>&1 \
+        || warn "could not enable one or both units (are they installed?)"
+    # Start now, but don't abort the install if config/Suricata isn't ready yet.
+    $SUDO systemctl start rockfish.service \
+        || warn "rockfish.service didn't start — set up /opt/rockfish/etc/rockfish.yaml and Suricata, then: systemctl start rockfish"
+    $SUDO systemctl start rockfish-report.service \
+        || warn "rockfish-report.service didn't start — check config, then: systemctl start rockfish-report"
+    success "Services enabled (detection + reporting every ${REPORT_INTERVAL_MIN} min)."
 }
 
 # ── Verify mode ──────────────────────────────────────────────────────────
@@ -245,6 +321,9 @@ verify_apt_install() {
                     pass "systemd unit ${u}.service present (enabled)"
                 else
                     vwarn "systemd unit ${u}.service present but not enabled (enable with: systemctl enable --now ${u})"
+                fi
+                if [ "$u" = "rockfish-report" ] && [ -f "$REPORT_DROPIN" ]; then
+                    pass "report cadence pinned to every ${REPORT_INTERVAL_MIN} min"
                 fi
             else
                 vwarn "systemd unit ${u}.service not registered (run: systemctl daemon-reload)"
@@ -308,10 +387,8 @@ run_verify() {
     printf '\n'
     printf "Summary: ${GREEN}%d passed${NC}, ${YELLOW}%d warnings${NC}, ${RED}%d failed${NC}\n" \
         "$PASS_N" "$WARN_N" "$FAIL_N"
-    if [ "$FAIL_N" -gt 0 ]; then
-        error "Installation incomplete — see FAIL items above."
-    fi
-    success "Installation looks correct and complete."
+    # Return non-zero if anything failed; callers decide how to react.
+    [ "$FAIL_N" -eq 0 ]
 }
 
 # ── Install driver ───────────────────────────────────────────────────────
@@ -321,13 +398,29 @@ run_install() {
 
     choose_method
     case "$METHOD" in
-        apt)    info "Method: APT repository"; install_apt ;;
-        docker) info "Method: Docker";         install_docker ;;
-        *)      error "Unknown ROCKFISH_METHOD='$METHOD' (expected 'apt' or 'docker')." ;;
+        apt)
+            info "Method: APT repository"
+            install_apt
+            # Optionally set up the systemd services (prompts unless overridden).
+            if want_services; then enable_services; fi
+            ;;
+        docker)
+            info "Method: Docker";  install_docker ;;
+        *)
+            error "Unknown ROCKFISH_METHOD='$METHOD' (expected 'apt' or 'docker')." ;;
     esac
 
+    # Always finish by verifying the result.
     printf '\n'
-    success "Done. Docs: https://docs.rockfishndr.com/getting-started/installation.html"
+    info "Running post-install verification…"
+    printf '\n'
+    if run_verify; then
+        printf '\n'; success "Done. Docs: https://docs.rockfishndr.com/getting-started/installation.html"
+    else
+        printf '\n'
+        warn "Install completed, but verification reported issues above (e.g. libduckdb not yet present). Resolve them and re-run: install.sh verify"
+        exit 1
+    fi
 }
 
 usage() {
@@ -340,9 +433,11 @@ Usage:
   install.sh help          Show this message
 
 Environment:
-  ROCKFISH_METHOD=apt|docker   Force the install method (default: auto-detect)
-  ROCKFISH_VERSION=X.Y.Z       Pin a version (default: latest)
-  ROCKFISH_IMAGE=...           Override the Docker image
+  ROCKFISH_METHOD=apt|docker      Force the install method (default: auto-detect)
+  ROCKFISH_VERSION=X.Y.Z          Pin a version (default: latest)
+  ROCKFISH_IMAGE=...              Override the Docker image
+  ROCKFISH_SERVICES=yes|no        Set up the systemd services without prompting
+  ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10)
 
 Examples:
   curl -fsSL https://docs.rockfishndr.com/install.sh | bash
@@ -354,7 +449,7 @@ EOF
 main() {
     case "${1:-install}" in
         install|"")      run_install ;;
-        verify|--verify) run_verify ;;
+        verify|--verify) run_verify || error "Installation incomplete — see FAIL items above." ;;
         help|-h|--help)  usage ;;
         *) error "Unknown command '$1' (expected: install | verify | help)." ;;
     esac

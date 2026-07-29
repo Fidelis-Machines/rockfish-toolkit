@@ -63,6 +63,23 @@ Set via environment variables:
 | `ROCKFISH_METHOD` | auto-detect | Force `apt` or `docker` |
 | `ROCKFISH_VERSION` | latest | Pin a version, e.g. `2026.07.6` |
 | `ROCKFISH_IMAGE` | `rockfishnetworks/toolkit` | Override the Docker image |
+| `ROCKFISH_SERVICES` | prompt | `yes`/`no` — set up the systemd services unattended |
+| `ROCKFISH_REPORT_INTERVAL_MIN` | `10` | Report regeneration cadence, in minutes |
+
+## systemd services
+
+On an APT install the script **asks** whether to enable the two services the
+package ships (skip the prompt with `ROCKFISH_SERVICES=yes|no`):
+
+| Service | Role |
+|---|---|
+| `rockfish.service` | **Detection** — collects Suricata EVE records, enriches them, and stores them as Parquet (`rockfish detect`) |
+| `rockfish-report.service` | **Reporting** — regenerates and serves the dashboard **every 10 minutes** (`ROCKFISH_REPORT_INTERVAL_MIN`) |
+
+The report cadence is pinned with a systemd drop-in
+(`/etc/systemd/system/rockfish-report.service.d/interval.conf`). The installer
+**runs `verify` automatically at the end** so you immediately see whether the
+result is complete.
 
 ```bash
 ROCKFISH_VERSION=2026.07.6 curl -fsSL https://docs.rockfishndr.com/install.sh | bash
