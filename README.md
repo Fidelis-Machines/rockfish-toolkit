@@ -49,18 +49,18 @@ one command. The installer auto-detects your platform — APT on Debian/Ubuntu,
 Docker elsewhere:
 
 ```bash
-curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Fidelis-Machines/rockfish-toolkit/main/install.sh | bash
 ```
 
 Options:
 
 ```bash
 # Pin a specific version
-ROCKFISH_VERSION=2026.07.6 curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+ROCKFISH_VERSION=2026.07.6 curl -fsSL https://raw.githubusercontent.com/Fidelis-Machines/rockfish-toolkit/main/install.sh | bash
 
 # Force a method (apt or docker)
-ROCKFISH_METHOD=apt    curl -fsSL https://docs.rockfishndr.com/install.sh | bash
-ROCKFISH_METHOD=docker curl -fsSL https://docs.rockfishndr.com/install.sh | bash
+ROCKFISH_METHOD=apt    curl -fsSL https://raw.githubusercontent.com/Fidelis-Machines/rockfish-toolkit/main/install.sh | bash
+ROCKFISH_METHOD=docker curl -fsSL https://raw.githubusercontent.com/Fidelis-Machines/rockfish-toolkit/main/install.sh | bash
 ```
 
 The same script lives in this repo at [`install.sh`](install.sh) — read it
