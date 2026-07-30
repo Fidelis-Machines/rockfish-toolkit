@@ -56,6 +56,10 @@
 #                                    (default: prompt).
 #    ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10).
 #    ROCKFISH_LIBDUCKDB_VERSION=X.Y.Z  Override the libduckdb version installed
+#    ROCKFISH_SURICATA=apt|docker|none  Suricata integration (default: none).
+#                                     apt    — install from OISF PPA + configure
+#                                     docker — run Suricata in Docker (coming soon)
+#                                     none   — configure only if already installed
 #                                    (default: inferred from bundled extensions).
 #    ROCKFISH_SKIP_LIBDUCKDB=1       Don't touch libduckdb (manage it yourself).
 #
@@ -116,9 +120,18 @@ LICENSE_FILE="${PREFIX}/etc/rockfish_license.json"  # where to drop the license
 DATA_STORE="${PREFIX}/data"                          # default parquet hive dir
 CONFIG_FILE="${PREFIX}/etc/rockfish.yaml"
 RUNTIME_DIR="/var/run/rockfish"                      # transient runtime data (tmpfs)
-EVE_SOCKET="/var/run/rockfish/eve.socket"            # default EVE input socket
+EVE_SOCKET="/var/run/rockfish/rockfish.sock"           # socket RockfishNDR creates; Suricata connects to it
 REPORT_DROPIN="/etc/systemd/system/rockfish-report.service.d/interval.conf"
 DETECT_DROPIN="/etc/systemd/system/rockfish.service.d/runtime.conf"
+
+# Suricata integration. ROCKFISH_SURICATA controls whether/how Suricata is
+# installed alongside RockfishNDR. Values: none (default), apt, docker.
+SURICATA_METHOD="${ROCKFISH_SURICATA:-none}"
+SURICATA_YAML="/etc/suricata/suricata.yaml"
+SURICATA_DROPIN="/etc/systemd/system/suricata.service.d/rockfish.conf"
+SURICATA_TMPFILES="/etc/tmpfiles.d/suricata-rockfish.conf"
+SOCKET_FIX_DROPIN="/etc/systemd/system/rockfish.service.d/socket-perms.conf"
+OISF_PPA="ppa:oisf/suricata-stable"
 
 # ── Pretty output ────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -364,6 +377,130 @@ install_docker() {
 EOF
 }
 
+
+# ── Suricata integration ──────────────────────────────────────────────────
+# Installs and/or configures Suricata to feed EVE JSON to RockfishNDR via
+# a Unix stream socket. Controlled by ROCKFISH_SURICATA=apt|docker|none.
+#
+# Background: Suricata's --user/--group flags call setgroups(0,NULL) which
+# clears ALL supplementary groups, bypassing PAM. Adding suricata to the
+# rockfish group via usermod has no effect at runtime. The systemd drop-in
+# changing --group rockfish is the only reliable fix.
+install_suricata_apt() {
+    info "Installing Suricata from OISF PPA..."
+    $SUDO add-apt-repository -y "${OISF_PPA}" >/dev/null 2>&1 
+        || error "Failed to add OISF PPA. Install add-apt-repository: sudo apt install software-properties-common"
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y suricata suricata-update 
+        || error "Failed to install Suricata"
+    info "Suricata installed from OISF PPA"
+}
+
+configure_suricata() {
+    case "$SURICATA_METHOD" in
+        apt)
+            install_suricata_apt
+            ;;
+        docker)
+            warn "Suricata Docker mode not yet implemented — skipping."
+            return 0
+            ;;
+        none)
+            if ! have suricata; then
+                info "Suricata not found and ROCKFISH_SURICATA not set — skipping integration."
+                info "To install and configure Suricata: re-run with ROCKFISH_SURICATA=apt"
+                return 0
+            fi
+            info "Suricata found — configuring integration."
+            ;;
+        *)
+            warn "Unknown ROCKFISH_SURICATA='$SURICATA_METHOD' (expected: apt, docker, none) — skipping."
+            return 0
+            ;;
+    esac
+
+    # 1. Add suricata to rockfish group (not sufficient alone — see drop-in below)
+    if getent group rockfish >/dev/null 2>&1; then
+        $SUDO usermod -aG rockfish suricata 2>/dev/null || true
+    fi
+
+    # 2. Systemd drop-in: run Suricata as group rockfish + manage runtime dir
+    $SUDO install -d -m 0755 "$(dirname "$SURICATA_DROPIN")"
+    $SUDO tee "$SURICATA_DROPIN" >/dev/null <<'DROPIN'
+# Managed by Rockfish install.sh
+# Runs Suricata as group rockfish so it can connect to the RockfishNDR socket.
+# NOTE: --group rockfish is required because Suricata calls setgroups(0,NULL)
+# at startup, clearing all supplementary groups set via usermod.
+[Service]
+ExecStart=
+ExecStart=/usr/bin/suricata --af-packet -c /etc/suricata/suricata.yaml --pidfile /run/suricata.pid --user suricata --group rockfish
+RuntimeDirectory=suricata
+RuntimeDirectoryMode=0775
+RuntimeDirectoryPreserve=yes
+After=rockfish.service
+Wants=rockfish.service
+DROPIN
+    info "Created Suricata systemd drop-in: ${SURICATA_DROPIN}"
+
+    # 3. tmpfiles.d: recreate /var/run/suricata on boot (belt-and-suspenders)
+    $SUDO tee "$SURICATA_TMPFILES" >/dev/null <<'TMPFILES'
+# Managed by Rockfish install.sh
+d /var/run/suricata 0775 suricata rockfish -
+TMPFILES
+    $SUDO systemd-tmpfiles --create "$SURICATA_TMPFILES" 2>/dev/null || true
+    info "Created tmpfiles.d entry: ${SURICATA_TMPFILES}"
+
+    # 4. Configure Suricata EVE output -> RockfishNDR socket
+    if [ -f "$SURICATA_YAML" ]; then
+        if grep -q "$EVE_SOCKET" "$SURICATA_YAML" 2>/dev/null; then
+            info "Suricata EVE already points at ${EVE_SOCKET} — leaving unchanged."
+        elif grep -q "filetype: regular" "$SURICATA_YAML" 2>/dev/null; then
+            $SUDO sed -i "s|filetype: regular|filetype: unix_stream|g" "$SURICATA_YAML"
+            $SUDO sed -i "s|filename: /var/log/suricata/eve.json|filename: ${EVE_SOCKET}|g" "$SURICATA_YAML"
+            info "Updated Suricata EVE output -> ${EVE_SOCKET}"
+        else
+            warn "Could not auto-configure Suricata EVE output."
+            warn "Manually set in ${SURICATA_YAML}:"
+            warn "  filetype: unix_stream"
+            warn "  filename: ${EVE_SOCKET}"
+        fi
+    else
+        warn "Suricata config not found at ${SURICATA_YAML} — skipping EVE configuration."
+    fi
+
+    # 5. Update rules and fix ownership
+    if have suricata-update; then
+        $SUDO chown -R suricata:suricata /var/lib/suricata/ 2>/dev/null || true
+        $SUDO suricata-update --no-reload 2>/dev/null 
+            || warn "suricata-update failed — run manually: sudo suricata-update"
+        info "Suricata rules updated"
+    else
+        warn "suricata-update not found — run: sudo apt install suricata-update"
+    fi
+
+    # 6. Fix socket permissions via rockfish.service post-start hook
+    # RockfishNDR creates the socket with 0755; Suricata needs write to connect.
+    $SUDO install -d -m 0755 "$(dirname "$SOCKET_FIX_DROPIN")"
+    $SUDO tee "$SOCKET_FIX_DROPIN" >/dev/null <<SOCKFIX
+# Managed by Rockfish install.sh
+# Fixes EVE socket permissions after RockfishNDR creates it.
+# Without this, Suricata gets Permission denied connecting to the socket.
+[Service]
+ExecStartPost=/bin/bash -c 'for i in $(seq 1 10); do [ -S ${EVE_SOCKET} ] && chmod 0770 ${EVE_SOCKET} && chgrp rockfish ${EVE_SOCKET} && break; sleep 1; done'
+SOCKFIX
+    info "Created socket permissions fix: ${SOCKET_FIX_DROPIN}"
+
+    $SUDO systemctl daemon-reload
+
+    if systemctl is-active --quiet suricata 2>/dev/null; then
+        $SUDO systemctl restart suricata 
+            || warn "Suricata restart failed — run: sudo systemctl restart suricata"
+    fi
+
+    success "Suricata integration configured."
+    info "Start order: rockfish must be running before suricata"
+    info "  sudo systemctl start rockfish && sudo systemctl start suricata"
+}
 # ── systemd services ─────────────────────────────────────────────────────
 # The package ships two units:
 #   rockfish.service         detection engine (`rockfish detect`) — collects
@@ -583,6 +720,28 @@ verify_apt_install() {
     # 8. APT wiring (so future upgrades work)
     [ -f "$KEYRING_PATH" ] && pass "APT signing key installed" || vwarn "APT signing key missing: $KEYRING_PATH"
     [ -f "$APT_LIST_PATH" ] && pass "APT source configured"    || vwarn "APT source missing: $APT_LIST_PATH"
+
+    # 9. Suricata integration checks (only if Suricata is installed)
+    if have suricata; then
+        [ -f "$SURICATA_DROPIN" ] \
+            && pass "Suricata systemd drop-in present: ${SURICATA_DROPIN}" \
+            || vwarn "Suricata drop-in missing: ${SURICATA_DROPIN} (run: install.sh with ROCKFISH_SURICATA=apt or none)"
+        [ -f "$SURICATA_TMPFILES" ] \
+            && pass "Suricata tmpfiles.d entry present: ${SURICATA_TMPFILES}" \
+            || vwarn "Suricata tmpfiles.d missing: ${SURICATA_TMPFILES}"
+        [ -f "$SOCKET_FIX_DROPIN" ] \
+            && pass "Socket permissions fix present: ${SOCKET_FIX_DROPIN}" \
+            || vwarn "Socket permissions fix missing: ${SOCKET_FIX_DROPIN}"
+        if [ -f "$SURICATA_YAML" ]; then
+            grep -q "$EVE_SOCKET" "$SURICATA_YAML" 2>/dev/null \
+                && pass "Suricata EVE output -> ${EVE_SOCKET}" \
+                || vwarn "Suricata EVE not pointing at ${EVE_SOCKET} — check ${SURICATA_YAML}"
+        else
+            vwarn "Suricata config not found: ${SURICATA_YAML}"
+        fi
+    else
+        vwarn "Suricata not installed — skipping integration checks (ROCKFISH_SURICATA=apt to install)"
+    fi
 }
 
 verify_docker_install() {
@@ -637,6 +796,7 @@ run_install() {
             install_libduckdb
             # Default config: parquet storage under /opt/rockfish/data + license path.
             configure_defaults
+            configure_suricata
             # Optionally set up the systemd services (prompts unless overridden).
             if want_services; then enable_services; fi
             ;;
@@ -681,6 +841,7 @@ Environment:
   ROCKFISH_SERVICES=yes|no        Set up the systemd services without prompting
   ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10)
   ROCKFISH_LIBDUCKDB_VERSION=X.Y.Z  Override the libduckdb version to install
+  ROCKFISH_SURICATA=apt|docker|none  Suricata integration (default: none; apt installs from OISF PPA)
 
 Examples:
   curl -fsSL https://docs.rockfishndr.com/install.sh | bash
