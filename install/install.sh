@@ -116,7 +116,7 @@ LICENSE_FILE="${PREFIX}/etc/rockfish_license.json"  # where to drop the license
 DATA_STORE="${PREFIX}/data"                          # default parquet hive dir
 CONFIG_FILE="${PREFIX}/etc/rockfish.yaml"
 RUNTIME_DIR="/var/run/rockfish"                      # transient runtime data (tmpfs)
-EVE_SOCKET="/var/run/rockfish/eve.socket"            # default EVE input socket
+EVE_SOCKET="/var/run/rockfish/rockfish.sock"         # default EVE input socket
 REPORT_DROPIN="/etc/systemd/system/rockfish-report.service.d/interval.conf"
 DETECT_DROPIN="/etc/systemd/system/rockfish.service.d/runtime.conf"
 
