@@ -7,6 +7,7 @@
 <p align="center"><em>The Suricata plugins &amp; deployment kit that integrate Suricata with Rockfish NDR.</em></p>
 
 <p align="center">
+  <a href="https://demo.rockfishndr.com"><strong>Live Demo</strong></a> &middot;
   <a href="https://docs.rockfishndr.com/">Documentation</a> &middot;
   <a href="https://github.com/Fidelis-Machines/rockfish-toolkit/issues">Issues</a>
 </p>
