@@ -312,7 +312,19 @@ configure_defaults() {
     $SUDO install -d -m 0755 "$DATA_STORE"
     id rockfish >/dev/null 2>&1 && $SUDO chown -R rockfish:rockfish "$DATA_STORE" || true
 
-    [ -f "$CONFIG_FILE" ] || return 0
+    # Ensure a config exists. The .deb postinst normally creates rockfish.yaml
+    # from the shipped example; self-heal here in case it didn't.
+    if [ ! -f "$CONFIG_FILE" ]; then
+        if [ -f "${CONFIG_FILE}.example" ]; then
+            info "Creating ${CONFIG_FILE} from the shipped example"
+            $SUDO cp "${CONFIG_FILE}.example" "$CONFIG_FILE"
+            id rockfish >/dev/null 2>&1 && $SUDO chown root:rockfish "$CONFIG_FILE" 2>/dev/null || true
+            $SUDO chmod 640 "$CONFIG_FILE" 2>/dev/null || true
+        else
+            warn "No ${CONFIG_FILE} or ${CONFIG_FILE}.example found — reinstall the rockfish package."
+            return 0
+        fi
+    fi
 
     if grep -qE '^[[:space:]]*dir:[[:space:]]*/var/lib/rockfish/parquet[[:space:]]*$' "$CONFIG_FILE"; then
         $SUDO sed -i -E "s#^([[:space:]]*)dir:[[:space:]]*/var/lib/rockfish/parquet[[:space:]]*\$#\1dir: ${DATA_STORE}#" "$CONFIG_FILE"
