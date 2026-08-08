@@ -1,0 +1,30 @@
+services:
+  rockfish-detect:
+    image: rockfish:latest
+    command: >
+      detect
+      --socket /var/run/suricata/eve.sock
+    volumes:
+      - /var/run/suricata:/var/run/suricata
+      - /var/lib/rockfish:/var/lib/rockfish
+      - /data/rockfish:/data/rockfish
+      - /opt/rockfish/etc:/opt/rockfish/etc:ro
+    restart: unless-stopped
+
+  rockfish-report:
+    image: rockfish:latest
+    command: >
+      report
+      --data-dir /data/rockfish
+      --sensor prod-sensor-01
+      --hive
+      --serve --port 3000
+      --license /opt/rockfish/etc/rockfish-license.json
+    volumes:
+      - /data/rockfish:/data/rockfish
+      - /opt/rockfish/etc:/opt/rockfish/etc:ro
+    ports:
+      - "8080:3000"
+    depends_on:
+      - rockfish-detect
+    restart: unless-stopped
