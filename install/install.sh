@@ -132,6 +132,9 @@ SURICATA_DROPIN="/etc/systemd/system/suricata.service.d/rockfish.conf"
 SURICATA_TMPFILES="/etc/tmpfiles.d/suricata-rockfish.conf"
 SOCKET_FIX_DROPIN="/etc/systemd/system/rockfish.service.d/socket-perms.conf"
 OISF_PPA="ppa:oisf/suricata-stable"
+# Fidelis custom Suricata repo (with --enable-plugins built in)
+# Set ROCKFISH_SURICATA_REPO=fidelis to use this instead of OISF PPA
+SURICATA_REPO="${ROCKFISH_SURICATA_REPO:-oisf}"
 
 # ── Pretty output ────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -387,6 +390,14 @@ EOF
 # rockfish group via usermod has no effect at runtime. The systemd drop-in
 # changing --group rockfish is the only reliable fix.
 install_suricata_apt() {
+    # Use Fidelis repo if ROCKFISH_SURICATA_REPO=fidelis, otherwise OISF PPA
+    # The Fidelis build includes --enable-plugins required for RockfishNDR plugins
+    if [ "${SURICATA_REPO}" = "fidelis" ]; then
+        info "Installing Suricata from Fidelis repo (plugin-enabled build)..."
+        # TODO: Add Fidelis APT repo and install fidelis-suricata package
+        # This will be implemented once the Fidelis Suricata package is published
+        warn "Fidelis Suricata repo not yet available — falling back to OISF PPA"
+    fi
     info "Installing Suricata from OISF PPA..."
     $SUDO add-apt-repository -y "${OISF_PPA}" >/dev/null 2>&1 
         || error "Failed to add OISF PPA. Install add-apt-repository: sudo apt install software-properties-common"
@@ -842,6 +853,7 @@ Environment:
   ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10)
   ROCKFISH_LIBDUCKDB_VERSION=X.Y.Z  Override the libduckdb version to install
   ROCKFISH_SURICATA=apt|docker|none  Suricata integration (default: none; apt installs from OISF PPA)
+  ROCKFISH_SURICATA_REPO=oisf|fidelis  Suricata APT source (default: oisf; fidelis uses plugin-enabled build)
 
 Examples:
   curl -fsSL https://docs.rockfishndr.com/install.sh | bash
