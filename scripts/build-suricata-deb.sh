@@ -44,10 +44,16 @@ PREFIX="/opt/rockfish-suricata"                    # self-contained install root
 EVE_SOCKET="/var/run/rockfish/rockfish.sock"       # Rockfish EVE input socket
 OUTPUT_DIR="$TOOLKIT_DIR/dist"
 PUBLISH=false
-# All Rockfish plugins. OT decoders + telemetry + FMADIO capture. (enip/modbus/
-# dnp3/mqtt are parsed by Suricata natively; enip here adds extended decoding.)
+# All Rockfish plugins. OT decoders + telemetry + FMADIO capture. (modbus/dnp3/
+# mqtt are parsed by Suricata natively.)
+#
+# enip is intentionally excluded: Suricata 8 added native EtherNet/IP support
+# (ALPROTO_ENIP is now a built-in app-layer proto), which both collides with the
+# plugin's own ALPROTO_ENIP at compile time and supersedes it at runtime. Rely
+# on Suricata's native ENIP decoder. Re-add only after a port that hooks the
+# native proto instead of registering a second "enip".
 PLUGINS="fmadio-ring transport_signals payload_entropy tls_pqc \
-opcua bacnet s7comm profinet coap lwm2m asterix iec61850 iec104 ethercat canopen enip"
+opcua bacnet s7comm profinet coap lwm2m asterix iec61850 iec104 ethercat canopen"
 
 usage() {
     sed -n '5,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
