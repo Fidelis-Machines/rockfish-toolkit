@@ -16,3 +16,5 @@ Cargo.lock
 *.swo
 .DS_Store
 .gh-token
+dist/
+*.deb

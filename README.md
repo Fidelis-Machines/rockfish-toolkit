@@ -138,9 +138,29 @@ All scripts live in [`scripts/`](scripts/) and must be run from inside the
 | [`scripts/build-signals.sh`](scripts/build-signals.sh) | `transport_signals` only. |
 | [`scripts/build-entropy.sh`](scripts/build-entropy.sh) | `payload_entropy` only. |
 | [`scripts/build-pqc.sh`](scripts/build-pqc.sh) | `tls_pqc` only. |
+| [`scripts/build-suricata-deb.sh`](scripts/build-suricata-deb.sh) | A self-contained **`rockfish-suricata` .deb** — Suricata built from source with all Rockfish plugins baked in. |
 
 The FMADIO ring plugin is built directly via its own `Makefile` (see
 [its README](suricata-plugin-fmadio-ring/README.md)).
+
+#### Rockfish Suricata package (`rockfish-suricata` .deb)
+
+Build a **self-contained Suricata** (from source) with the Rockfish plugins
+baked in, a Rockfish-wired `suricata.yaml` (EVE → `/var/run/rockfish/rockfish.sock`),
+and a systemd unit — installed under `/opt/rockfish-suricata`. The build runs in
+a `debian:bookworm` container (glibc-pinned, reproducible, like the engine's
+`.deb`).
+
+```bash
+./scripts/build-suricata-deb.sh                          # Suricata 8.0.6, all plugins
+SURICATA_VERSION=8.0.6 ./scripts/build-suricata-deb.sh   # pin a version
+./scripts/build-suricata-deb.sh --deb-rev 2              # bump packaging revision
+./scripts/build-suricata-deb.sh --plugins "transport_signals payload_entropy tls_pqc"
+```
+
+Output: `dist/rockfish-suricata_<ver>-rockfish<rev>_amd64.deb`. Install with
+`sudo dpkg -i`, then `sudo systemctl enable --now rockfish-suricata`. Requires
+Docker.
 
 ### Run Rockfish in Docker
 
