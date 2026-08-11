@@ -101,6 +101,15 @@ docker run --rm \
             libnfnetlink-dev libunwind-dev python3 dpkg-dev
         rustc --version; cargo --version
 
+        # cbindgen generates the rust-bindings.h that src/rust.h includes.
+        # Without it, Suricata configure sets HAVE_CBINDGEN=no and silently
+        # skips the header — then any plugin that includes app-layer.h/rust.h
+        # (tls_pqc, enip) fails to compile. cargo installs it to
+        # $CARGO_HOME/bin, which is already on PATH in rust:1-bookworm.
+        # (Suricata requires cbindgen >= 0.20.0.)
+        cargo install --locked cbindgen
+        cbindgen --version
+
         # ── 1. Suricata from source ──────────────────────────────────────
         cd /build 2>/dev/null || { mkdir -p /build && cd /build; }
         wget -q "https://www.openinfosecfoundation.org/download/suricata-${SURICATA_VERSION}.tar.gz"
