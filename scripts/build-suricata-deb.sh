@@ -87,15 +87,19 @@ docker run --rm \
     -e EVE_SOCKET="$EVE_SOCKET" \
     -e PLUGINS="$PLUGINS" \
     -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
-    debian:bookworm bash -euxc '
+    rust:1-bookworm bash -euxc '
         export DEBIAN_FRONTEND=noninteractive
+        # Base image is rust:1-bookworm — recent rustup Rust (Suricata 8 needs
+        # >= 1.75; the distro rustc is too old) on bookworm glibc (2.36), the same
+        # reproducibility contract as build-deb.sh. Do NOT apt-install rustc/cargo
+        # (that would shadow rustup with the old 1.63 package).
         apt-get update
-        # Suricata build deps + Rust (Suricata 7+/8 need cargo) + plugin build deps.
         apt-get install -y --no-install-recommends \
             build-essential cmake make pkg-config wget ca-certificates file \
             libpcre2-dev libyaml-dev libjansson-dev libmagic-dev libcap-ng-dev \
             libpcap-dev zlib1g-dev liblz4-dev libnet1-dev libnetfilter-queue-dev \
-            libnfnetlink-dev rustc cargo dpkg-dev
+            libnfnetlink-dev libunwind-dev python3 dpkg-dev
+        rustc --version; cargo --version
 
         # ── 1. Suricata from source ──────────────────────────────────────
         cd /build 2>/dev/null || { mkdir -p /build && cd /build; }
