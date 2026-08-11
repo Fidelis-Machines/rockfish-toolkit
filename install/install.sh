@@ -99,6 +99,12 @@ SERVICES="${ROCKFISH_SERVICES:-}"
 REPORT_INTERVAL_MIN="${ROCKFISH_REPORT_INTERVAL_MIN:-10}"
 SERVICES_ENABLED=0   # set to 1 once enable_services runs
 
+# Rockfish ingests Suricata EVE/JSON — it needs a Suricata upstream but does not
+# ship one by default. When no Suricata is found, offer the bundled
+# `rockfish-suricata` package (Suricata + Rockfish plugins, same APT repo).
+# ROCKFISH_SURICATA forces the choice non-interactively (yes/no); unset prompts.
+SURICATA="${ROCKFISH_SURICATA:-}"
+
 # The engine dynamically links libduckdb, which the .deb does NOT ship (it is
 # version-locked to the DuckDB the release was built against). The installer
 # fetches the matching libduckdb unless one is already present. Override the
@@ -216,6 +222,83 @@ install_apt() {
 rockfish_installed() {
     dpkg-query -W -f='${Status}' rockfish 2>/dev/null | grep -q "install ok installed" && return 0
     [ -x "$BIN" ]
+}
+
+# ── Suricata (the EVE producer) ──────────────────────────────────────────
+# Rockfish does not capture packets; it ingests Suricata EVE/JSON. If the host
+# has no Suricata, offer the bundled `rockfish-suricata` package (Suricata +
+# Rockfish plugins) from the same APT repo.
+
+# Echo a short description of any Suricata found, or nothing. Checks our package
+# first, then a distro suricata, then common binary locations.
+detect_suricata() {
+    if dpkg-query -W -f='${Status}' rockfish-suricata 2>/dev/null | grep -q "install ok installed"; then
+        printf 'rockfish-suricata (package)\n'; return 0
+    fi
+    [ -x /opt/rockfish-suricata/bin/suricata ] && { printf '/opt/rockfish-suricata/bin/suricata\n'; return 0; }
+    if dpkg-query -W -f='${Status}' suricata 2>/dev/null | grep -q "install ok installed"; then
+        printf 'suricata (package)\n'; return 0
+    fi
+    local p
+    for p in "$(command -v suricata 2>/dev/null || true)" /usr/sbin/suricata /usr/bin/suricata /opt/suricata/bin/suricata; do
+        [ -n "$p" ] && [ -x "$p" ] && { printf '%s\n' "$p"; return 0; }
+    done
+    return 1
+}
+
+# True only if OUR bundled rockfish-suricata is the one installed.
+rockfish_suricata_installed() {
+    dpkg-query -W -f='${Status}' rockfish-suricata 2>/dev/null | grep -q "install ok installed" && return 0
+    [ -x /opt/rockfish-suricata/bin/suricata ]
+}
+
+# After the rockfish package is in, make sure there is an EVE source. Skip
+# quietly if any Suricata already exists; otherwise offer rockfish-suricata.
+maybe_install_suricata() {
+    if rockfish_suricata_installed; then
+        info "rockfish-suricata already installed — skipping."
+        return 0
+    fi
+    local ans found; found="$(detect_suricata || true)"
+    if [ -n "$found" ]; then
+        info "Existing Suricata detected ($found) — Rockfish will ingest its EVE output."
+        info "  (To use the bundled build instead: sudo apt-get install rockfish-suricata)"
+        return 0
+    fi
+
+    # No Suricata anywhere. Decide whether to install the bundled package.
+    case "$SURICATA" in
+        1|y|Y|yes|YES|true)
+            info "No Suricata found — installing rockfish-suricata (ROCKFISH_SURICATA=$SURICATA)." ;;
+        0|n|N|no|NO|false)
+            info "No Suricata found — skipping rockfish-suricata (ROCKFISH_SURICATA=$SURICATA)."
+            info "  Rockfish needs a Suricata EVE source; install one later: sudo apt-get install rockfish-suricata"
+            return 0 ;;
+        *)
+            # stdin is the piped script under `curl | bash`, so prompt on /dev/tty.
+            # Only a successful read counts; EOF / no-tty falls through to skip so
+            # we never install unattended.
+            if [ -r /dev/tty ] && { printf "No Suricata detected. Rockfish ingests Suricata EVE logs — install the bundled 'rockfish-suricata' package now? [Y/n] " > /dev/tty; read -r ans < /dev/tty; }; then
+                case "$ans" in
+                    [Nn]*)
+                        info "Skipping rockfish-suricata. Install later: sudo apt-get install rockfish-suricata"
+                        return 0 ;;
+                esac
+            else
+                info "No interactive input — skipping rockfish-suricata (set ROCKFISH_SURICATA=yes to install unattended)."
+                return 0
+            fi ;;
+    esac
+
+    # The APT source was already configured by install_apt.
+    need_root
+    if $SUDO apt-get install -y rockfish-suricata; then
+        success "rockfish-suricata installed."
+        info "  Set your capture interface in /opt/rockfish-suricata/etc/suricata/suricata.yaml, then:"
+        info "    sudo systemctl enable --now rockfish-suricata"
+    else
+        warn "Failed to install rockfish-suricata. Retry later: sudo apt-get install rockfish-suricata"
+    fi
 }
 
 # ── libduckdb runtime dependency ─────────────────────────────────────────
@@ -649,6 +732,9 @@ run_install() {
             install_libduckdb
             # Default config: parquet storage under /opt/rockfish/data + license path.
             configure_defaults
+            # Ensure an EVE source exists: offer bundled rockfish-suricata if
+            # no Suricata is present (prompts unless ROCKFISH_SURICATA is set).
+            maybe_install_suricata
             # Optionally set up the systemd services (prompts unless overridden).
             if want_services; then enable_services; fi
             ;;
@@ -691,6 +777,8 @@ Environment:
   ROCKFISH_VERSION=X.Y.Z          Pin a version (default: latest)
   ROCKFISH_IMAGE=...              Override the Docker image
   ROCKFISH_SERVICES=yes|no        Set up the systemd services without prompting
+  ROCKFISH_SURICATA=yes|no        Install bundled rockfish-suricata if no Suricata
+                                  is found, without prompting (default: prompt)
   ROCKFISH_REPORT_INTERVAL_MIN=N  Report cadence in minutes (default: 10)
   ROCKFISH_LIBDUCKDB_VERSION=X.Y.Z  Override the libduckdb version to install
 
